@@ -2,8 +2,11 @@
 
 ## Overview
 
-Four crates — three `spi` providers and one `saf` facade:
+Five crates — one shared `core`, three `spi` providers, and one `saf` facade:
 
+- **`message-broker-svc-core`** — generic implementation code every `spi` crate depends
+  on, exploiting `message-broker-pattern`'s own `Validator` trait bound directly
+  (`validate_config<C: Validator>`). See "Why `core` exists" below.
 - **`message-broker-svc-nats-spi`** — `NatsMessageBroker` (`async-nats`) + `NatsConfig`
   (this crate's own `[message_broker]` TOML config shape: `url`).
 - **`message-broker-svc-kafka-spi`** — `KafkaMessageBroker` (`rdkafka`) + `KafkaConfig`
@@ -21,10 +24,34 @@ Four crates — three `spi` providers and one `saf` facade:
   not a convention left to discipline (`NatsMessageBroker` etc. are `pub` within their
   own `spi` crates only, never re-exported from `saf`).
 
-Each `spi` crate depends only on `message-broker-pattern` (the `MessageBroker`/
-`Validator` traits and value types) plus whatever technology client it wraps —
+Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`Validator`
+traits and value types), `message-broker-svc-core` (the one shared, generic
+implementation every backend reuses), and whatever technology client it wraps —
 `message-broker-svc-saf` is the only thing that depends on all three `spi` crates
 together.
+
+## Why `core` exists
+
+Mirrors `ledger`'s own split: `LedgerPayload` (the trait) lives in `ledger-base-port`,
+pure port crate, zero implementation — but the *generic, reusable implementation* that
+exploits it (`RedbLogStore<P: LedgerPayload>`, `GrpcNetwork<P>`, the whole raft
+replication stack) lives in `ledger`'s own `adapter/replication` crate, never inside
+`ledger-base-port` itself. Every downstream consumer (`a2a-ledger`'s `TaskEvent`,
+`a2ac-ledger`'s own payload type) brings its own shape and gets that shared machinery
+for free.
+
+`message-broker-pattern` is this repo's `ledger-base-port` equivalent: `Validator` (the
+trait) and nothing else — no generic function, no reusable algorithm, just the trait
+signature. `message-broker-svc-core` is this repo's `adapter/replication` equivalent:
+the one place `Validator`'s bound gets a real, generic implementation
+(`validate_config<C: Validator>`), reused identically by `NatsConfig`/`KafkaConfig`/
+`PostgresConfig` — each `spi` crate brings its own config shape, calls
+`message_broker_svc_core::validate_config(&config)?` once in its own constructor, and
+gets the same validate-then-map-to-`BrokerError` behavior every other backend gets,
+without duplicating it. Before this crate existed, three backends validated construction
+three different ways: NATS hand-rolled its own empty-`url` check, Kafka and Postgres
+validated nothing at all. Adding a fourth backend later means implementing `Validator`
+on its own config type and calling this one function — not inventing a fourth approach.
 
 ## Config: each `spi` crate owns its own, none shared
 
@@ -36,7 +63,8 @@ config type (`NatsConfig`, `KafkaConfig`, `PostgresConfig`), independently imple
   (presence-based enabling, `deny_unknown_fields`, cross-field validation).
 - `message-broker-pattern`'s own `Validator` — the trait `MessageBroker::validator()`
   requires a return value for; each broker holds `Arc<its-own-Config>` and hands it back
-  directly.
+  directly. Each constructor also calls `message-broker-svc-core`'s
+  `validate_config(&config)` once, before doing any I/O — see "Why `core` exists" above.
 
 This follows `edge-llm`'s own precedent (`provider/contract`'s doc comment): a contract
 type must never implement a foreign trait like `OptionalSection` itself — that would be
@@ -60,6 +88,7 @@ flowchart TD
     end
 
     subgraph svc["message-broker-svc"]
+        core["message-broker-svc-core<br/>validate_config&lt;C: Validator&gt;"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory, NoopMessageBroker"]
         nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsConfig"]
         kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaConfig"]
@@ -69,6 +98,11 @@ flowchart TD
         kafka -->|implements| contract
         postgres -->|implements| contract
         saf -->|implements| contract
+        core -->|generic over| contract
+
+        nats -->|calls validate_config| core
+        kafka -->|calls validate_config| core
+        postgres -->|calls validate_config| core
 
         saf -->|wires, feature-gated| nats
         saf -->|wires, feature-gated| kafka

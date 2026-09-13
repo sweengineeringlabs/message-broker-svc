@@ -20,6 +20,7 @@ path = "src/lib.rs"
 
 [dependencies]
 message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-svc-core = { path = "../../core", version = "0.1.0" }
 configbuilder = "0.8"
 serde         = { version = "1.0", features = ["derive"] }
 futures       = "0.3"

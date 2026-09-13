@@ -40,6 +40,22 @@ mod postgres_feature {
         );
     }
 
+    /// @covers: MessageBrokerFactory::postgres — rejects a blank `queue_name`
+    /// via `PostgresConfig`'s own `Validator` impl (through
+    /// `message-broker-svc-core`'s `validate_config`), before ever opening a pool.
+    #[test]
+    fn test_postgres_connect_rejects_blank_queue_name() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(MessageBrokerFactory::postgres(
+            "postgres://user:pass@127.0.0.1:1/app",
+            "   ",
+        ));
+        assert!(matches!(result, Err(BrokerError::Connection(_))));
+    }
+
     // ── Live-pgmq tests ──────────────────────────────────────────────────────
     //
     // Run with a real Postgres + `pgmq` instance:

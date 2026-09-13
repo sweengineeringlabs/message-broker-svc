@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "main/message-broker/core",
     "main/message-broker/spi/*",
     "main/message-broker/saf",
 ]

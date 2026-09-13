@@ -129,4 +129,58 @@ real assertions + 5 correctly `#[ignore]`d live-infra tests), `cargo fmt --check
 both clean, `grep`-confirmed zero remaining references to `BackendKind`/
 `MessageBrokerConfig`/`from_config` anywhere in the repo.
 
+## Amendment: 2026-09-13 -- add `message-broker-svc-core`, wire real construction-time validation
+
+The previous amendment gave each `spi` crate its own `Validator`-implementing config
+type but never wired that trait to anywhere that mattered: `NatsMessageBroker::connect`
+had its own hand-rolled `url.trim().is_empty()` check instead of using `NatsConfig`'s own
+`Validator` impl, and `KafkaMessageBroker::new`/`PostgresMessageBroker::connect`
+validated nothing at all before connecting. `Validator` was implemented on all three
+config types but only ever exercised through `configbuilder`'s TOML-loading path and
+unit tests.
+
+Checked this against `ledger`'s own crate split, at the user's direction: `LedgerPayload`
+(the trait) lives in `ledger-base-port`, a pure port crate — but the generic, reusable
+*implementation* that exploits it (`RedbLogStore<P: LedgerPayload>`, `GrpcNetwork<P>`,
+the whole raft replication stack) lives in `ledger`'s own `adapter/replication` crate,
+never inside `ledger-base-port` itself. `a2a-ledger`'s `TaskEvent` and `a2ac-ledger`'s
+own payload type each bring their own shape and get that shared machinery for free.
+
+**Decision**: added `message-broker-svc-core`, a new workspace member depending only on
+`message-broker-pattern`, providing one generic function:
+`validate_config<C: Validator>(config: &C) -> Result<(), BrokerError>`. Every `spi`
+crate now depends on it and calls it once in its own constructor
+(`NatsMessageBroker::connect`/`KafkaMessageBroker::new`/`PostgresMessageBroker::connect`),
+replacing NATS's duplicate ad hoc check and adding real validation to Kafka/Postgres for
+the first time. Nothing was removed: `MessageBroker::validator()`,
+`message-broker-pattern`'s `Validator` trait, and `MessageBrokerFactory::validate<V>`
+are all unchanged.
+
+This mirrors `ledger`'s split exactly: `message-broker-pattern` stays `ledger-base-port`'s
+equivalent — trait signatures only, zero implementation, zero generic algorithms, no
+exceptions. `message-broker-svc-core` is the `adapter/replication` equivalent — the one
+place a pattern trait bound gets a real, reusable implementation, so every `spi` crate
+brings its own config shape and reuses the same validation behavior instead of each
+inventing its own.
+
+`application_type = "lib"` (not `"adapter"`): this crate implements no trait itself, it
+calls one generically — `arch audit`'s `adapter_implements_port` rule confirmed
+`"adapter"` was the wrong classification. Accepted, pre-existing-category `arch audit`
+exceptions on this crate, matching the same categories already documented above:
+`package_name_no_sea_suffix`/`boundary_no_antipattern_names` (the `-core` suffix, an
+org-wide naming convention this `arch` version's rule predates), `examples_dir_lib`
+(info-severity), `security_dependency_audit_configured` (root `deny.toml` exists, not
+visible when auditing a nested crate path in isolation). `workspace_members_prefer_glob`
+also fires on `scm/Cargo.toml`'s explicit `core`/`saf` entries alongside the `spi/*`
+glob — confirmed structurally forced: `cargo metadata` errors if `main/message-broker/*`
+is used instead, since `spi/` itself (the glob's parent) has no `Cargo.toml`; explicit
+listing is the rule's own documented fallback for exactly this case.
+
+Verified: `cargo test --workspace --all-targets --features nats,kafka,postgres` clean
+(new tests: `message-broker-svc-core`'s own 2, plus one new blank-field regression test
+per backend in `-saf`'s existing integration test files). `cargo fmt --check` and
+`cargo clippy --workspace --all-targets --features nats,kafka,postgres -- -D warnings`
+both clean. `arch audit .` from `scm/`: 505 passed, 7 failed across 5 members — all 7
+matching an already-documented accepted category, none new defects.
+
 [← Docs index](../../README.md)

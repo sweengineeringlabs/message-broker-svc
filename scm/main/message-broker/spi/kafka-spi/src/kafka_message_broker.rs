@@ -114,6 +114,12 @@ impl KafkaMessageBroker {
     ///
     /// Returns [`BrokerError::Connection`] if the producer configuration is invalid.
     pub fn new(brokers: &str, group_id: &str) -> Result<Self, BrokerError> {
+        let config = KafkaConfig {
+            url: brokers.to_owned(),
+            group_id: group_id.to_owned(),
+        };
+        message_broker_svc_core::validate_config(&config)?;
+
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", brokers)
             .set(
@@ -127,10 +133,7 @@ impl KafkaMessageBroker {
             producer,
             brokers: brokers.to_owned(),
             group_id: group_id.to_owned(),
-            config: Arc::new(KafkaConfig {
-                url: brokers.to_owned(),
-                group_id: group_id.to_owned(),
-            }),
+            config: Arc::new(config),
         })
     }
 }

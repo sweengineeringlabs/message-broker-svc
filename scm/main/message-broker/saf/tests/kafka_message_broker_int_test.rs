@@ -18,6 +18,19 @@ async fn test_kafka_message_broker_factory_constructs_without_network() {
     );
 }
 
+/// @covers: MessageBrokerFactory::kafka — rejects a blank `group_id` via
+/// `KafkaConfig`'s own `Validator` impl (through `message-broker-svc-core`'s
+/// `validate_config`), before ever building an rdkafka client.
+#[cfg(feature = "kafka")]
+#[test]
+fn test_kafka_message_broker_factory_rejects_blank_group_id() {
+    use message_broker_pattern::BrokerError;
+    use message_broker_svc_saf::MessageBrokerFactory;
+
+    let result = MessageBrokerFactory::kafka("127.0.0.1:9999", "   ");
+    assert!(matches!(result, Err(BrokerError::Connection(_))));
+}
+
 /// @covers: MessageBrokerFactory::kafka — health_check fails for an unreachable broker.
 #[cfg(feature = "kafka")]
 #[tokio::test]

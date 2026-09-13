@@ -12,8 +12,9 @@ message-broker-svc/
 │   ├── 3-design/adr/ADR-001-extract-from-edge-runtime-pilot.md
 │   └── 4-development/README.md, developer_guide.md   # this file
 └── scm/
-    ├── Cargo.toml          # workspace: [main/message-broker/spi/*, main/message-broker/saf]
+    ├── Cargo.toml          # workspace: [core, spi/*, saf]
     └── main/message-broker/
+        ├── core/              # message-broker-svc-core -- validate_config<C: Validator>
         ├── spi/
         │   ├── nats-spi/        # message-broker-svc-nats-spi
         │   ├── kafka-spi/       # message-broker-svc-kafka-spi
@@ -33,7 +34,7 @@ message-broker-svc/
 
 ## Working on Any Crate
 
-All four crates are members of `scm/Cargo.toml`, so from `scm/`:
+All five crates are members of `scm/Cargo.toml`, so from `scm/`:
 
 ```
 cargo test --workspace --all-targets
@@ -92,6 +93,19 @@ local config type (`NatsConfig`/`KafkaConfig`/`PostgresConfig`), implementing bo
 Adding a new backend means adding a new `spi` crate with its own config type and a new
 `MessageBrokerFactory` constructor — never touching a shared enum or struct, because
 there isn't one.
+
+## message-broker-svc-core: the One Shared, Generic Implementation
+
+Every `spi` crate's constructor calls `message_broker_svc_core::validate_config(&config)`
+once, before doing any I/O — one generic function
+(`validate_config<C: Validator>(config: &C) -> Result<(), BrokerError>`), reused
+identically by all three backends instead of each hand-rolling its own check. Mirrors
+`ledger`'s own split: `LedgerPayload` (trait) lives in `ledger-base-port`; the generic
+implementation that exploits it (`RedbLogStore<P: LedgerPayload>`, etc.) lives in
+`ledger`'s own `adapter/replication` crate, never in the port crate. Adding a fifth
+backend means implementing `Validator` on its own config type and calling this same
+function — not inventing a new validation approach. See `architecture.md`'s "Why `core`
+exists" section for the full reasoning.
 
 ## The path + version Dependency Rule
 

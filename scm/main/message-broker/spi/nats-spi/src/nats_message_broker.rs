@@ -68,22 +68,23 @@ pub struct NatsMessageBroker {
 impl NatsMessageBroker {
     /// Establish a NATS connection and return a broker handle.
     ///
-    /// Rejects an empty/whitespace-only `url` immediately: `async_nats::connect`
+    /// Rejects an empty/whitespace-only `url` immediately, via
+    /// [`message_broker_svc_core::validate_config`]: `async_nats::connect`
     /// treats an empty address as a slow DNS-resolution failure rather than a
     /// fast parse error, which would otherwise hang this call for the OS
     /// resolver's full timeout instead of returning quickly.
     pub async fn connect(url: impl Into<String>) -> Result<Self, BrokerError> {
         let url = url.into();
-        if url.trim().is_empty() {
-            return Err(BrokerError::Connection(
-                "nats backend requires a non-empty `url`".to_owned(),
-            ));
-        }
-        let config = Arc::new(NatsConfig { url: url.clone() });
+        let config = NatsConfig { url: url.clone() };
+        message_broker_svc_core::validate_config(&config)?;
+
         let client = async_nats::connect(url)
             .await
             .map_err(|e| BrokerError::Connection(e.to_string()))?;
-        Ok(Self { client, config })
+        Ok(Self {
+            client,
+            config: Arc::new(config),
+        })
     }
 }
 

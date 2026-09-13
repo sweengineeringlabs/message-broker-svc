@@ -60,6 +60,12 @@ impl PostgresMessageBroker {
     /// Returns [`BrokerError::Connection`] if the DSN is malformed, the server
     /// is unreachable, or the `pgmq` extension is not installed.
     pub async fn connect(dsn: &str, queue_name: &str) -> Result<Self, BrokerError> {
+        let config = PostgresConfig {
+            url: dsn.to_owned(),
+            queue_name: queue_name.to_owned(),
+        };
+        message_broker_svc_core::validate_config(&config)?;
+
         let pool = PgPool::connect(dsn)
             .await
             .map_err(|e| BrokerError::Connection(e.to_string()))?;
@@ -70,10 +76,7 @@ impl PostgresMessageBroker {
 
         Ok(Self {
             pool,
-            config: Arc::new(PostgresConfig {
-                url: dsn.to_owned(),
-                queue_name: queue_name.to_owned(),
-            }),
+            config: Arc::new(config),
         })
     }
 
