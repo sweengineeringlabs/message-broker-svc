@@ -1,0 +1,45 @@
+[package]
+name         = "message-broker-svc-saf"
+version      = "0.1.0"
+edition      = "2021"
+license      = "MIT OR Apache-2.0"
+authors      = ["SWE Engineering Labs"]
+repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
+rust-version = "1.98"
+description  = "message-broker-svc SAF: construction/dispatch factory selecting among the NATS, Kafka, and Postgres MessageBroker backends. Extracted from edge-runtime's runtime-message-broker-saf per edge-message-broker#6."
+keywords     = ["message-broker", "pubsub", "saf", "async", "swe"]
+categories   = ["network-programming", "asynchronous"]
+
+[package.metadata.arch]
+application_type = "facade"
+service_type     = "message-broker"
+
+[lib]
+name = "message_broker_svc_saf"
+path = "src/lib.rs"
+
+[features]
+default  = []
+nats     = ["dep:message-broker-pattern-nats-spi"]
+kafka    = ["dep:message-broker-pattern-kafka-spi"]
+postgres = ["dep:message-broker-pattern-postgres-spi"]
+
+[dependencies]
+message-broker-pattern-contract     = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-pattern-core         = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-pattern-nats-spi     = { path = "../spi/nats", optional = true }
+message-broker-pattern-kafka-spi    = { path = "../spi/kafka", optional = true }
+message-broker-pattern-postgres-spi = { path = "../spi/postgres", optional = true }
+configbuilder = "0.8"
+
+[dev-dependencies]
+tokio   = { version = "1.52", features = ["rt-multi-thread", "macros"] }
+futures = "0.3"
+
+[lints.rust]
+unsafe_code  = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
