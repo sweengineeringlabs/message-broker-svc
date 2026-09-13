@@ -41,8 +41,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-Each `spi` crate's real feature is off by default in `message-broker-svc-saf` — enable
-what you're working on:
+`MessageBrokerFactory::noop()` is always available, no feature required. Each real
+backend's feature is off by default in `message-broker-svc-saf` — enable what you're
+working on:
 
 ```
 cargo test --manifest-path main/message-broker/saf/Cargo.toml --features nats
@@ -81,19 +82,32 @@ Enforced, not a style preference: `NatsMessageBroker`/`KafkaMessageBroker`/
 `message-broker-svc-saf` alone cannot name a concrete backend type without also
 depending directly on that `spi` crate itself.
 
+## Config: Each spi Crate Owns Its Own, None Shared
+
+There is no `BackendKind` enum, no shared `MessageBrokerConfig` struct, and no
+`from_config` dispatch anywhere in this repo — see `architecture.md`'s own section on
+this and ADR-001's amendment for the full reasoning. Each `spi` crate defines its own
+local config type (`NatsConfig`/`KafkaConfig`/`PostgresConfig`), implementing both
+`configbuilder::OptionalSection` and `message-broker-pattern::Validator` independently.
+Adding a new backend means adding a new `spi` crate with its own config type and a new
+`MessageBrokerFactory` constructor — never touching a shared enum or struct, because
+there isn't one.
+
 ## The path + version Dependency Rule
 
 `message-broker-svc-saf` depends on its sibling `spi` crates with **both** `path` and
 `version` set — same reasoning as `message-broker-pattern`'s own developer guide (a
-`path`-only dependency makes the crate unpublishable). The `message-broker-pattern-*`
-crates are pinned via `git`/`branch` for now, not `path` + `version`, since they live in
-a separate repo with no tag cut yet.
+`path`-only dependency makes the crate unpublishable). The `message-broker-pattern`
+dependency is pinned via `git`/`branch` for now, not `path` + `version`, since it lives
+in a separate repo with no tag cut yet.
 
 ## Scope
 
 See `architecture.md`'s Scope boundary section before adding anything here that isn't a
-`MessageBroker` implementation — `TaskQueue`, `ApplicationConfig`/`BrokerProvider`, and a
-real in-memory backend were all deliberately left out of this extraction.
+`MessageBroker` implementation — `TaskQueue`, `ApplicationConfig`/`BrokerProvider`, and
+the real, `tokio::sync::broadcast`-backed in-memory backend were all deliberately left
+out of this extraction. `NoopMessageBroker` (in `-saf`) is this repo's own no-op
+reference implementation, not that real in-memory backend.
 
 ## See Also
 

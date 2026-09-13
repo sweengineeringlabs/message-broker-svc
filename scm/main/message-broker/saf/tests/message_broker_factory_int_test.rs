@@ -1,42 +1,77 @@
-//! Integration tests for [`MessageBrokerFactory`].
+//! Integration tests for [`MessageBrokerFactory`]'s no-op broker and `validate`.
+
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use configbuilder::{BuilderFinalizer, FeatureStateOps, OptionalSection};
-use message_broker_pattern_core::MessageBrokerConfig;
+use message_broker_pattern::HealthCheckRequest;
 use message_broker_svc_saf::MessageBrokerFactory;
 
-/// @covers: MessageBrokerFactory::create_config_builder — the built loader is
-/// genuinely usable, not just non-erroring: loading an absent
-/// `[message_broker]` section through it resolves to Disabled rather than
-/// panicking or silently enabling.
-#[test]
-fn test_message_broker_factory_create_config_builder_is_pre_seeded() {
-    let loader = MessageBrokerFactory::create_config_builder()
-        .build_loader()
-        .expect("builder must construct a valid loader");
-    let state = MessageBrokerConfig::load_optional(&loader)
-        .expect("an absent section must resolve to Disabled, not an error");
+/// @covers: noop
+#[tokio::test]
+async fn test_noop_health_check_returns_ok() {
+    assert!(MessageBrokerFactory::noop()
+        .health_check(HealthCheckRequest)
+        .await
+        .is_ok());
+}
+
+/// @covers: noop
+#[tokio::test]
+async fn test_noop_publish_then_subscribe_is_inert() {
+    use futures::StreamExt as _;
+    use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
+
+    let broker = MessageBrokerFactory::noop();
+    broker
+        .publish(PublishRequest {
+            topic: "svc-test".to_string(),
+            message: std::sync::Arc::new(Message::new(b"ping".as_ref())),
+        })
+        .await
+        .unwrap();
+    let mut response = broker
+        .subscribe(SubscribeRequest {
+            topic: "svc-test".to_string(),
+        })
+        .await
+        .unwrap();
     assert!(
-        state.is_disabled(),
-        "a builder with no configured directories must resolve every section to Disabled"
+        response.stream.next().await.is_none(),
+        "noop broker delivers nothing"
     );
 }
 
-/// @covers: MessageBrokerFactory::from_config — in_memory is not this factory's job.
-#[tokio::test]
-async fn test_from_config_in_memory_returns_unavailable() {
-    use message_broker_pattern_contract::{BackendKind, BrokerError};
-    use message_broker_pattern_core::MessageBrokerConfig;
+/// @covers: validate — delegates to the value's own Validator::validate
+#[test]
+fn test_validate_ok_for_valid_type_happy() {
+    use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
 
-    let config = MessageBrokerConfig {
-        backend: BackendKind::InMemory,
-        url: None,
-        group_id: None,
-        queue_name: None,
-    };
-    let result = MessageBrokerFactory::from_config(&config).await;
-    assert!(
-        matches!(result, Err(BrokerError::Unavailable(_))),
-        "in_memory must be rejected — it belongs to message-broker-pattern-saf::BrokerSvc"
+    struct Valid;
+    impl Validator for Valid {
+        fn validate(&self, _request: ValidationRequest) -> Result<(), ValidationError> {
+            Ok(())
+        }
+    }
+    assert_eq!(MessageBrokerFactory::validate(&Valid), Ok(()));
+}
+
+/// @covers: validate — returns err for an invalid type
+#[test]
+fn test_validate_err_for_invalid_type_error() {
+    use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
+
+    struct Invalid;
+    impl Validator for Invalid {
+        fn validate(&self, _request: ValidationRequest) -> Result<(), ValidationError> {
+            Err(ValidationError {
+                violations: vec!["bad state".to_string()],
+            })
+        }
+    }
+    let result = MessageBrokerFactory::validate(&Invalid);
+    assert_eq!(
+        result,
+        Err(ValidationError {
+            violations: vec!["bad state".to_string()],
+        })
     );
 }

@@ -5,19 +5,20 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 
-use message_broker_pattern_contract::BrokerError;
-use message_broker_pattern_contract::BrokerFuture;
-use message_broker_pattern_contract::HealthCheckRequest;
-use message_broker_pattern_contract::Message;
-use message_broker_pattern_contract::MessageBroker;
-use message_broker_pattern_contract::MessageStream;
-use message_broker_pattern_contract::PublishRequest;
-use message_broker_pattern_contract::SubscribeRequest;
-use message_broker_pattern_contract::SubscribeResponse;
-use message_broker_pattern_contract::Validator;
-use message_broker_pattern_contract::ValidatorRequest;
-use message_broker_pattern_contract::ValidatorResponse;
-use message_broker_pattern_core::MessageBrokerConfig;
+use message_broker_pattern::BrokerError;
+use message_broker_pattern::BrokerFuture;
+use message_broker_pattern::HealthCheckRequest;
+use message_broker_pattern::Message;
+use message_broker_pattern::MessageBroker;
+use message_broker_pattern::MessageStream;
+use message_broker_pattern::PublishRequest;
+use message_broker_pattern::SubscribeRequest;
+use message_broker_pattern::SubscribeResponse;
+use message_broker_pattern::Validator;
+use message_broker_pattern::ValidatorRequest;
+use message_broker_pattern::ValidatorResponse;
+
+use crate::NatsConfig;
 
 /// Health-check round-trip timeout.
 ///
@@ -61,7 +62,7 @@ fn decode_headers(headers: Option<&async_nats::HeaderMap>) -> HashMap<String, St
 /// maps connection errors to [`BrokerError::Connection`].
 pub struct NatsMessageBroker {
     client: async_nats::Client,
-    config: Arc<MessageBrokerConfig>,
+    config: Arc<NatsConfig>,
 }
 
 impl NatsMessageBroker {
@@ -78,12 +79,7 @@ impl NatsMessageBroker {
                 "nats backend requires a non-empty `url`".to_owned(),
             ));
         }
-        let config = Arc::new(MessageBrokerConfig {
-            backend: message_broker_pattern_contract::BackendKind::Nats,
-            url: Some(url.clone()),
-            group_id: None,
-            queue_name: None,
-        });
+        let config = Arc::new(NatsConfig { url: url.clone() });
         let client = async_nats::connect(url)
             .await
             .map_err(|e| BrokerError::Connection(e.to_string()))?;

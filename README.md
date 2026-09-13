@@ -27,13 +27,20 @@ let broker = MessageBrokerFactory::nats("nats://localhost:4222").await?;
 | [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | `PostgresMessageBroker` — `pgmq`-backed |
 | [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — the construction/dispatch facade consumers depend on |
 
-**Scope note:** this repo covers only `message-broker-pattern-contract`'s `MessageBroker`
-trait. `edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
+No `BackendKind` enum, no shared config struct, no `from_config` dispatch — each `spi`
+crate owns its own config type (`NatsConfig`/`KafkaConfig`/`PostgresConfig`), and
+`MessageBrokerFactory` exposes four independent, directly-typed constructors
+(`noop`/`nats`/`kafka`/`postgres`), not a runtime-selectable registry. See
+[Architecture](docs/3-design/architecture.md) for why.
+
+**Scope note:** this repo covers only `message-broker-pattern`'s `MessageBroker` trait.
+`edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
 (`runtime-message-broker-contract`, a superset) and an `ApplicationConfig`/`BrokerProvider`
 composition layer — neither was ported here; they remain `edge-runtime`-specific concerns
-until a similar extraction is scoped for them separately. The in-memory backend is not
-part of this repo either — see `message-broker-pattern-saf::BrokerSvc::noop_broker` for
-the reference no-op broker.
+until a similar extraction is scoped for them separately. The real,
+`tokio::sync::broadcast`-backed in-memory backend is not part of this repo either —
+`MessageBrokerFactory::noop()` is this repo's own no-op reference implementation, not
+that.
 
 ## Documentation
 

@@ -1,22 +1,23 @@
 //! Feature-gated coverage of the `postgres` broker backend's error paths, via
-//! `MessageBrokerFactory::postgres`/`from_config`.
+//! `MessageBrokerFactory::postgres`.
 //!
 //! No live Postgres/`pgmq` instance is available in CI or local dev by default, so
-//! most tests here exercise what is verifiable without one: connection/config error
-//! paths. The `pgmq`-backed round-trip tests (send/pop against a real queue) at the
+//! most tests here exercise what is verifiable without one: the connection error
+//! path. The `pgmq`-backed round-trip tests (send/pop against a real queue) at the
 //! bottom of this file require a live Postgres with `CREATE EXTENSION pgmq;`
 //! applied — they are `#[ignore]`d by default and run explicitly with
 //! `POSTGRES_DSN=... cargo test --features postgres -- --include-ignored`.
 //!
 //! Direct-dep coverage for `sqlx` itself lives in
-//! `message-broker-svc-postgres-spi`'s own `tests/sqlx_int_test.rs`.
+//! `message-broker-svc-postgres-spi`'s own `tests/sqlx_int_test.rs`. Config
+//! shape/validation coverage (`PostgresConfig`) lives in that same crate's
+//! `tests/postgres_config_int_test.rs`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 #[cfg(feature = "postgres")]
 mod postgres_feature {
-    use message_broker_pattern_contract::BrokerError;
-    use message_broker_pattern_core::MessageBrokerConfig;
+    use message_broker_pattern::BrokerError;
     use message_broker_svc_saf::MessageBrokerFactory;
 
     /// @covers: MessageBrokerFactory::postgres
@@ -36,52 +37,6 @@ mod postgres_feature {
         assert!(
             matches!(result, Err(BrokerError::Connection(_))),
             "expected a Connection error for an unreachable Postgres host"
-        );
-    }
-
-    /// @covers: MessageBrokerFactory::from_config
-    /// `from_config` with `BackendKind::Postgres` and no `url` must fail fast
-    /// with a Connection error rather than attempting to connect with an empty DSN.
-    #[test]
-    fn test_from_config_postgres_without_url_returns_connection_error() {
-        use message_broker_pattern_contract::BackendKind;
-        let config = MessageBrokerConfig {
-            backend: BackendKind::Postgres,
-            url: None,
-            group_id: None,
-            queue_name: Some("edge_events".into()),
-        };
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        let result = rt.block_on(MessageBrokerFactory::from_config(&config));
-        assert!(
-            matches!(result, Err(BrokerError::Connection(_))),
-            "expected a Connection error when postgres backend has no url"
-        );
-    }
-
-    /// @covers: MessageBrokerFactory::from_config
-    /// `from_config` with `BackendKind::Postgres` and no `queue_name` must fail
-    /// fast with a Connection error.
-    #[test]
-    fn test_from_config_postgres_without_queue_name_returns_connection_error() {
-        use message_broker_pattern_contract::BackendKind;
-        let config = MessageBrokerConfig {
-            backend: BackendKind::Postgres,
-            url: Some("postgres://user:pass@127.0.0.1:1/app".into()),
-            group_id: None,
-            queue_name: None,
-        };
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        let result = rt.block_on(MessageBrokerFactory::from_config(&config));
-        assert!(
-            matches!(result, Err(BrokerError::Connection(_))),
-            "expected a Connection error when postgres backend has no queue_name"
         );
     }
 
@@ -112,7 +67,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern_contract::{
+        use message_broker_pattern::{
             Message, MessageBroker as _, PublishRequest, SubscribeRequest,
         };
 
@@ -160,7 +115,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern_contract::{
+        use message_broker_pattern::{
             Message, MessageBroker as _, PublishRequest, SubscribeRequest,
         };
 
@@ -212,7 +167,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern_contract::{
+        use message_broker_pattern::{
             Message, MessageBroker as _, PublishRequest, SubscribeRequest,
         };
 
@@ -259,35 +214,6 @@ mod postgres_feature {
             received.payload.as_slice(),
             payload,
             "message sent by a now-dropped broker instance must still be readable by a fresh one"
-        );
-    }
-}
-
-#[cfg(not(feature = "postgres"))]
-mod postgres_feature_disabled {
-    use message_broker_pattern_contract::{BackendKind, BrokerError};
-    use message_broker_pattern_core::MessageBrokerConfig;
-    use message_broker_svc_saf::MessageBrokerFactory;
-
-    /// @covers: MessageBrokerFactory::from_config
-    /// Without the `postgres` feature compiled in, selecting the Postgres
-    /// backend must fail with Unavailable, not panic or silently no-op.
-    #[test]
-    fn test_from_config_postgres_without_feature_returns_unavailable() {
-        let config = MessageBrokerConfig {
-            backend: BackendKind::Postgres,
-            url: Some("postgres://user:pass@127.0.0.1:1/app".into()),
-            group_id: None,
-            queue_name: Some("edge_events".into()),
-        };
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        let result = rt.block_on(MessageBrokerFactory::from_config(&config));
-        assert!(
-            matches!(result, Err(BrokerError::Unavailable(_))),
-            "expected Unavailable when the postgres feature is not compiled in"
         );
     }
 }

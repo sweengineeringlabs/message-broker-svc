@@ -19,16 +19,17 @@ name = "message_broker_svc_kafka_spi"
 path = "src/lib.rs"
 
 [dependencies]
-message-broker-pattern-contract = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-pattern-core     = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+configbuilder = "0.8"
+serde    = { version = "1.0", features = ["derive"] }
 futures  = "0.3"
 tokio    = { version = "1.52", features = ["sync", "rt", "time"] }
 rdkafka  = { version = "0.39", features = ["tokio", "cmake-build"] }
 
 [dev-dependencies]
-tokio   = { version = "1.52", features = ["rt-multi-thread", "macros"] }
-futures = "0.3"
-bytes   = "1"
+tokio    = { version = "1.52", features = ["rt-multi-thread", "macros"] }
+futures  = "0.3"
+tempfile = "3.27"
 
 [lints.rust]
 unsafe_code  = "deny"

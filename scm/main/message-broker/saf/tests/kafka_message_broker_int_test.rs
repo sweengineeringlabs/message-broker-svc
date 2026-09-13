@@ -22,7 +22,7 @@ async fn test_kafka_message_broker_factory_constructs_without_network() {
 #[cfg(feature = "kafka")]
 #[tokio::test]
 async fn test_kafka_message_broker_health_check_fails_for_unreachable_broker() {
-    use message_broker_pattern_contract::{BrokerError, HealthCheckRequest, MessageBroker as _};
+    use message_broker_pattern::{BrokerError, HealthCheckRequest, MessageBroker as _};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker =
@@ -40,9 +40,7 @@ async fn test_kafka_message_broker_health_check_fails_for_unreachable_broker() {
 async fn test_kafka_message_broker_publish_fails_for_unreachable_broker() {
     use std::sync::Arc;
 
-    use message_broker_pattern_contract::{
-        BrokerError, Message, MessageBroker as _, PublishRequest,
-    };
+    use message_broker_pattern::{BrokerError, Message, MessageBroker as _, PublishRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker =
@@ -56,69 +54,6 @@ async fn test_kafka_message_broker_publish_fails_for_unreachable_broker() {
     assert!(
         matches!(result, Err(BrokerError::Publish { .. })),
         "publish must return Publish error for unreachable broker"
-    );
-}
-
-/// @covers: MessageBrokerFactory::from_config — kafka backend without url is rejected.
-#[cfg(feature = "kafka")]
-#[tokio::test]
-async fn test_from_config_kafka_without_url_returns_connection_error() {
-    use message_broker_pattern_contract::{BackendKind, BrokerError};
-    use message_broker_pattern_core::MessageBrokerConfig;
-    use message_broker_svc_saf::MessageBrokerFactory;
-
-    let cfg = MessageBrokerConfig {
-        backend: BackendKind::Kafka,
-        url: None,
-        group_id: Some("workers".into()),
-        queue_name: None,
-    };
-    let result = MessageBrokerFactory::from_config(&cfg).await;
-    assert!(
-        matches!(result, Err(BrokerError::Connection(_))),
-        "from_config without url must return Connection error"
-    );
-}
-
-/// @covers: MessageBrokerFactory::from_config — kafka backend without group_id is rejected.
-#[cfg(feature = "kafka")]
-#[tokio::test]
-async fn test_from_config_kafka_without_group_id_returns_connection_error() {
-    use message_broker_pattern_contract::{BackendKind, BrokerError};
-    use message_broker_pattern_core::MessageBrokerConfig;
-    use message_broker_svc_saf::MessageBrokerFactory;
-
-    let cfg = MessageBrokerConfig {
-        backend: BackendKind::Kafka,
-        url: Some("127.0.0.1:9999".into()),
-        group_id: None,
-        queue_name: None,
-    };
-    let result = MessageBrokerFactory::from_config(&cfg).await;
-    assert!(
-        matches!(result, Err(BrokerError::Connection(_))),
-        "from_config without group_id must return Connection error"
-    );
-}
-
-/// @covers: MessageBrokerFactory::from_config — without the kafka feature, Unavailable.
-#[cfg(not(feature = "kafka"))]
-#[tokio::test]
-async fn test_from_config_kafka_without_feature_returns_unavailable() {
-    use message_broker_pattern_contract::{BackendKind, BrokerError};
-    use message_broker_pattern_core::MessageBrokerConfig;
-    use message_broker_svc_saf::MessageBrokerFactory;
-
-    let cfg = MessageBrokerConfig {
-        backend: BackendKind::Kafka,
-        url: Some("127.0.0.1:9999".into()),
-        group_id: Some("workers".into()),
-        queue_name: None,
-    };
-    let result = MessageBrokerFactory::from_config(&cfg).await;
-    assert!(
-        matches!(result, Err(BrokerError::Unavailable(_))),
-        "expected Unavailable when the kafka feature is not compiled in"
     );
 }
 
@@ -150,9 +85,7 @@ async fn test_publish_subscribe_roundtrip_with_live_broker() {
     use std::sync::Arc;
 
     use futures::StreamExt as _;
-    use message_broker_pattern_contract::{
-        Message, MessageBroker as _, PublishRequest, SubscribeRequest,
-    };
+    use message_broker_pattern::{Message, MessageBroker as _, PublishRequest, SubscribeRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let brokers = require_kafka_brokers();
@@ -204,9 +137,7 @@ async fn test_publish_subscribe_headers_survive_roundtrip_with_live_broker() {
     use std::sync::Arc;
 
     use futures::StreamExt as _;
-    use message_broker_pattern_contract::{
-        Message, MessageBroker as _, PublishRequest, SubscribeRequest,
-    };
+    use message_broker_pattern::{Message, MessageBroker as _, PublishRequest, SubscribeRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let brokers = require_kafka_brokers();
@@ -254,7 +185,7 @@ async fn test_publish_subscribe_headers_survive_roundtrip_with_live_broker() {
 #[cfg(feature = "kafka")]
 #[tokio::test]
 async fn test_subscribe_returns_stream_without_panicking() {
-    use message_broker_pattern_contract::{MessageBroker as _, SubscribeRequest};
+    use message_broker_pattern::{MessageBroker as _, SubscribeRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker = MessageBrokerFactory::kafka("127.0.0.1:9999", "test-group-cap")

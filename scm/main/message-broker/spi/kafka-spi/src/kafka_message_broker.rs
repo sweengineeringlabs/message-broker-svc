@@ -13,20 +13,20 @@ use rdkafka::message::{BorrowedHeaders, Header, Headers as _, Message as Rdkafka
 use rdkafka::producer::{FutureProducer, FutureRecord, Producer as _};
 use rdkafka::types::RDKafkaErrorCode;
 
-use message_broker_pattern_contract::BackendKind;
-use message_broker_pattern_contract::BrokerError;
-use message_broker_pattern_contract::BrokerFuture;
-use message_broker_pattern_contract::HealthCheckRequest;
-use message_broker_pattern_contract::Message;
-use message_broker_pattern_contract::MessageBroker;
-use message_broker_pattern_contract::MessageStream;
-use message_broker_pattern_contract::PublishRequest;
-use message_broker_pattern_contract::SubscribeRequest;
-use message_broker_pattern_contract::SubscribeResponse;
-use message_broker_pattern_contract::Validator;
-use message_broker_pattern_contract::ValidatorRequest;
-use message_broker_pattern_contract::ValidatorResponse;
-use message_broker_pattern_core::MessageBrokerConfig;
+use message_broker_pattern::BrokerError;
+use message_broker_pattern::BrokerFuture;
+use message_broker_pattern::HealthCheckRequest;
+use message_broker_pattern::Message;
+use message_broker_pattern::MessageBroker;
+use message_broker_pattern::MessageStream;
+use message_broker_pattern::PublishRequest;
+use message_broker_pattern::SubscribeRequest;
+use message_broker_pattern::SubscribeResponse;
+use message_broker_pattern::Validator;
+use message_broker_pattern::ValidatorRequest;
+use message_broker_pattern::ValidatorResponse;
+
+use crate::KafkaConfig;
 
 /// Monotonic counter mixed into each subscriber's consumer-group ID so
 /// multiple `subscribe()` calls within the same process never collide even if
@@ -101,7 +101,7 @@ pub struct KafkaMessageBroker {
     /// call derives its own unique group from this base (see
     /// [`unique_subscriber_group_id`]) so subscribers fan out rather than compete.
     group_id: String,
-    config: Arc<MessageBrokerConfig>,
+    config: Arc<KafkaConfig>,
 }
 
 impl KafkaMessageBroker {
@@ -127,11 +127,9 @@ impl KafkaMessageBroker {
             producer,
             brokers: brokers.to_owned(),
             group_id: group_id.to_owned(),
-            config: Arc::new(MessageBrokerConfig {
-                backend: BackendKind::Kafka,
-                url: Some(brokers.to_owned()),
-                group_id: Some(group_id.to_owned()),
-                queue_name: None,
+            config: Arc::new(KafkaConfig {
+                url: brokers.to_owned(),
+                group_id: group_id.to_owned(),
             }),
         })
     }

@@ -6,7 +6,7 @@ license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
 repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
 rust-version = "1.98"
-description  = "message-broker-svc SAF: construction/dispatch factory selecting among the NATS, Kafka, and Postgres MessageBroker backends. Extracted from edge-runtime's runtime-message-broker-saf per edge-message-broker#6."
+description  = "message-broker-svc SAF: construction/dispatch factory for the no-op reference broker and the NATS, Kafka, and Postgres MessageBroker backends. Extracted from edge-runtime's runtime-message-broker-saf per edge-message-broker#6."
 keywords     = ["message-broker", "pubsub", "saf", "async", "swe"]
 categories   = ["network-programming", "asynchronous"]
 
@@ -25,12 +25,12 @@ kafka    = ["dep:message-broker-svc-kafka-spi"]
 postgres = ["dep:message-broker-svc-postgres-spi"]
 
 [dependencies]
-message-broker-pattern-contract  = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-pattern-core      = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-svc-nats-spi      = { path = "../spi/nats-spi", optional = true }
-message-broker-svc-kafka-spi     = { path = "../spi/kafka-spi", optional = true }
-message-broker-svc-postgres-spi  = { path = "../spi/postgres-spi", optional = true }
+message-broker-pattern           = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-svc-nats-spi      = { path = "../spi/nats-spi", version = "0.1.0", optional = true }
+message-broker-svc-kafka-spi     = { path = "../spi/kafka-spi", version = "0.1.0", optional = true }
+message-broker-svc-postgres-spi  = { path = "../spi/postgres-spi", version = "0.1.0", optional = true }
 configbuilder = "0.8"
+futures       = "0.3"
 
 [dev-dependencies]
 tokio   = { version = "1.52", features = ["rt-multi-thread", "macros"] }

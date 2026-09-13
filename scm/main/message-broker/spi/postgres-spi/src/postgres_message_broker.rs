@@ -10,20 +10,20 @@ use futures::stream;
 use sqlx::PgPool;
 use sqlx::Row;
 
-use message_broker_pattern_contract::BackendKind;
-use message_broker_pattern_contract::BrokerError;
-use message_broker_pattern_contract::BrokerFuture;
-use message_broker_pattern_contract::HealthCheckRequest;
-use message_broker_pattern_contract::Message;
-use message_broker_pattern_contract::MessageBroker;
-use message_broker_pattern_contract::MessageStream;
-use message_broker_pattern_contract::PublishRequest;
-use message_broker_pattern_contract::SubscribeRequest;
-use message_broker_pattern_contract::SubscribeResponse;
-use message_broker_pattern_contract::Validator;
-use message_broker_pattern_contract::ValidatorRequest;
-use message_broker_pattern_contract::ValidatorResponse;
-use message_broker_pattern_core::MessageBrokerConfig;
+use message_broker_pattern::BrokerError;
+use message_broker_pattern::BrokerFuture;
+use message_broker_pattern::HealthCheckRequest;
+use message_broker_pattern::Message;
+use message_broker_pattern::MessageBroker;
+use message_broker_pattern::MessageStream;
+use message_broker_pattern::PublishRequest;
+use message_broker_pattern::SubscribeRequest;
+use message_broker_pattern::SubscribeResponse;
+use message_broker_pattern::Validator;
+use message_broker_pattern::ValidatorRequest;
+use message_broker_pattern::ValidatorResponse;
+
+use crate::PostgresConfig;
 
 /// Delay between `pgmq.pop` polls when a queue has no message available.
 const POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -49,7 +49,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(250);
 /// target database.
 pub struct PostgresMessageBroker {
     pool: PgPool,
-    config: Arc<MessageBrokerConfig>,
+    config: Arc<PostgresConfig>,
 }
 
 impl PostgresMessageBroker {
@@ -70,11 +70,9 @@ impl PostgresMessageBroker {
 
         Ok(Self {
             pool,
-            config: Arc::new(MessageBrokerConfig {
-                backend: BackendKind::Postgres,
-                url: Some(dsn.to_owned()),
-                group_id: None,
-                queue_name: Some(queue_name.to_owned()),
+            config: Arc::new(PostgresConfig {
+                url: dsn.to_owned(),
+                queue_name: queue_name.to_owned(),
             }),
         })
     }
