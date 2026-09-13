@@ -19,6 +19,14 @@ Four crates:
 | [`message-broker-pattern-postgres-spi`](scm/main/message-broker/spi/postgres) | `PostgresMessageBroker` — `pgmq`-backed |
 | [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — the construction/dispatch facade consumers depend on |
 
+## Documentation
+
+| Document | Description |
+|----------|--------------|
+| [Architecture](scm/docs/3-design/architecture.md) | Component diagram, dispatch table, scope boundary |
+| [ADR-001](scm/docs/3-design/adr/ADR-001-extract-from-edge-runtime-pilot.md) | Why this repo extracts from edge-runtime's pilot |
+| [Developer Guide](scm/docs/4-development/developer_guide.md) | Repo layout, feature flags, live-infra tests |
+
 **Scope note:** this repo covers only `message-broker-pattern-contract`'s `MessageBroker`
 trait. `edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
 (`runtime-message-broker-contract`, a superset) and an `ApplicationConfig`/`BrokerProvider`
