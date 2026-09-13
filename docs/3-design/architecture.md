@@ -2,12 +2,17 @@
 
 ## Overview
 
-Five crates — one shared `core`, three `spi` providers, and one `saf` facade:
+Six crates — one shared `core`, four `spi` providers, and one `saf` facade:
 
 - **`message-broker-svc-core`** — generic implementation code every `spi` crate depends
   on, exploiting `message-broker-pattern`'s own `Validator` trait bound directly:
   `validate_config<C: Validator>` and `validator_response<C: Validator>`. See "Why
   `core` exists" below.
+- **`message-broker-svc-inmemory-spi`** — `InMemoryMessageBroker`
+  (`tokio::sync::broadcast`) + `InMemoryConfig` (no fields — this backend takes no
+  runtime parameters). Real, in-process pub/sub with full fan-out, restoring the
+  functionality `edge-message-broker`'s own extraction left behind — see "Restoring the
+  real in-memory backend" below.
 - **`message-broker-svc-nats-spi`** — `NatsMessageBroker` (`async-nats`) + `NatsConfig`
   (this crate's own `[message_broker]` TOML config shape: `url`).
 - **`message-broker-svc-kafka-spi`** — `KafkaMessageBroker` (`rdkafka`) + `KafkaConfig`
@@ -28,8 +33,53 @@ Five crates — one shared `core`, three `spi` providers, and one `saf` facade:
 Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`Validator`
 traits and value types), `message-broker-svc-core` (the one shared, generic
 implementation every backend reuses), and whatever technology client it wraps —
-`message-broker-svc-saf` is the only thing that depends on all three `spi` crates
+`message-broker-svc-saf` is the only thing that depends on all four `spi` crates
 together.
+
+## Restoring the real in-memory backend
+
+`edge-message-broker`'s own extraction into this repo left one real gap: it ported
+`NoopMessageBroker` (discards published messages) but not
+`edge-runtime`'s real `runtime-message-broker-core::InMemoryMessageBroker`
+(`tokio::sync::broadcast`-backed, genuinely delivers to every subscriber). That gap was
+initially believed harmless -- `BackendKind`/`MessageBrokerConfig` (the vocabulary
+`edge-runtime`'s own dispatch used to select it) were being removed as an anti-pattern
+anyway, and it looked like nothing outside `edge-message-broker` itself depended on the
+removed vocabulary.
+
+That belief was checked against `edge-runtime`'s actual source, not assumed: `edge-runtime`'s
+`runtime-message-broker-contract` crate re-exports `swe_edge_message_broker::{BackendKind,
+MessageBrokerConfig}` directly, and `runtime-message-broker-saf`'s
+`MessageBrokerFactory::from_config`/`impl BrokerProvider for MessageBrokerFactory` is a
+real, currently-live dispatch function pinned via git tag `v0.3.8`, one of whose four
+branches constructs a real `InMemoryMessageBroker`. The in-memory backend is not
+hypothetical, unused vocabulary -- it is live functionality `edge-runtime` depends on
+today.
+
+**Decision**: added `message-broker-svc-inmemory-spi`, restoring `InMemoryMessageBroker`
+faithfully (topic length/emptiness checks, `DEFAULT_CHANNEL_CAPACITY`-bounded broadcast
+channels, lazy per-topic channel creation, `StreamLagged` on receiver lag) -- ported
+1:1 from `edge-runtime`'s own implementation, not reinvented. `InMemoryConfig` (zero
+fields, since this backend takes no runtime parameters) implements
+`Validator`/`OptionalSection` the same way every other `spi` crate's config does, for
+the same reason: `MessageBroker::validator()` needs a return value, and
+presence/absence of an empty `[message_broker]` section still has real,
+`deny_unknown_fields`-enforced meaning.
+
+**What is not restored, deliberately**: the `BackendKind`-driven `from_config`/
+`BrokerProvider` dispatch mechanism itself. That capability's correct home is a
+`runtime-svc-registry`-based composition layer built on top of this repo's independent
+constructors (`MessageBrokerFactory::in_memory`/`nats`/`kafka`/`postgres`), living in
+`edge-runtime`'s own repo -- not a `BackendKind`-shaped enum reintroduced here. Bringing
+that enum back would undo the correctly-identified anti-pattern removal (a contract or
+contract-adjacent vocabulary must never enumerate specific technology names); the fix
+for "how does a downstream composition site pick a backend at runtime" is the registry
+pattern already established elsewhere in this org, not a regression to the shape that
+was removed. `edge-message-broker#6`'s own E3 already tracks updating `edge-runtime#96`'s
+pilot scope to depend on this repo instead of its own divergent in-tree copy and the
+still-live `swe-edge-message-broker` git-tag dependency -- not resolved by this
+amendment, which only closes the backend-implementation gap, not the composition-layer
+gap.
 
 ## Why `core` exists
 
@@ -104,20 +154,24 @@ flowchart TD
     subgraph svc["message-broker-svc"]
         core["message-broker-svc-core<br/>validate_config, validator_response"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory, NoopMessageBroker"]
+        inmemory["message-broker-svc-inmemory-spi<br/>InMemoryMessageBroker + InMemoryConfig"]
         nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsConfig"]
         kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaConfig"]
         postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker + PostgresConfig"]
 
+        inmemory -->|implements| contract
         nats -->|implements| contract
         kafka -->|implements| contract
         postgres -->|implements| contract
         saf -->|implements| contract
         core -->|generic over| contract
 
+        inmemory -->|calls validate_config| core
         nats -->|calls validate_config| core
         kafka -->|calls validate_config| core
         postgres -->|calls validate_config| core
 
+        saf -->|wires, feature-gated| inmemory
         saf -->|wires, feature-gated| nats
         saf -->|wires, feature-gated| kafka
         saf -->|wires, feature-gated| postgres
@@ -126,10 +180,11 @@ flowchart TD
 
 ## Dispatch: four independent constructors, no shared selection type
 
-`MessageBrokerFactory::noop()` / `::nats(url)` / `::kafka(brokers, group_id)` /
-`::postgres(dsn, queue_name)` — four independent, directly-typed, Cargo-feature-gated
-(except `noop`, always available) associated functions. No enum or config value ties
-them together, and no runtime branch picks among several compiled-in backends by name.
+`MessageBrokerFactory::noop()` / `::in_memory()` / `::nats(url)` /
+`::kafka(brokers, group_id)` / `::postgres(dsn, queue_name)` — five independent,
+directly-typed, Cargo-feature-gated (except `noop`, always available) associated
+functions. No enum or config value ties them together, and no runtime branch picks
+among several compiled-in backends by name.
 A given build of this crate compiles in whichever features are turned on; the caller
 already knows, at the point they write the one line calling a specific constructor,
 which backend that build is for.
@@ -169,12 +224,18 @@ were deliberately **not** ported:
   source they were extracted from (separate files, no shared state), so this was a clean
   cut, not a partial one.
 - **`ApplicationConfig`/`BrokerProvider`** — `edge-runtime`-specific composition
-  abstractions layered on top of `MessageBrokerFactory`. Not part of
-  `message-broker-pattern`, and this repo has no dependency on `edge-runtime`.
-- **The real, `tokio::sync::broadcast`-backed in-memory backend** —
-  `edge-runtime`'s own `runtime-message-broker-core::InMemoryMessageBroker`, distinct
-  from this repo's `NoopMessageBroker` (which discards published messages rather than
-  broadcasting them). Neither this repo nor `message-broker-pattern` ships that real
-  in-memory implementation today.
+  abstractions layered on top of `MessageBrokerFactory`, and the `BackendKind`-driven
+  `from_config` dispatch mechanism itself. Not part of `message-broker-pattern`, and
+  this repo has no dependency on `edge-runtime`. See "Restoring the real in-memory
+  backend" above for why the *backend itself* (unlike this dispatch layer) has since
+  been ported.
+
+**Update**: the real, `tokio::sync::broadcast`-backed in-memory backend
+(`edge-runtime`'s own `runtime-message-broker-core::InMemoryMessageBroker`) was
+initially left out alongside these, on the belief that nothing outside
+`edge-message-broker` depended on it. That belief was wrong — see "Restoring the real
+in-memory backend" above — and this backend now ships here as
+`message-broker-svc-inmemory-spi`, distinct from `NoopMessageBroker` (which still just
+discards published messages; `MessageBrokerFactory::noop()` is unchanged).
 
 [← Docs index](../README.md)

@@ -16,6 +16,7 @@ message-broker-svc/
     └── main/message-broker/
         ├── core/              # message-broker-svc-core -- validate_config<C: Validator>
         ├── spi/
+        │   ├── inmemory-spi/    # message-broker-svc-inmemory-spi
         │   ├── nats-spi/        # message-broker-svc-nats-spi
         │   ├── kafka-spi/       # message-broker-svc-kafka-spi
         │   └── postgres-spi/    # message-broker-svc-postgres-spi
@@ -34,7 +35,7 @@ message-broker-svc/
 
 ## Working on Any Crate
 
-All five crates are members of `scm/Cargo.toml`, so from `scm/`:
+All six crates are members of `scm/Cargo.toml`, so from `scm/`:
 
 ```
 cargo test --workspace --all-targets
@@ -47,11 +48,15 @@ backend's feature is off by default in `message-broker-svc-saf` — enable what 
 working on:
 
 ```
+cargo test --manifest-path main/message-broker/saf/Cargo.toml --features inmemory
 cargo test --manifest-path main/message-broker/saf/Cargo.toml --features nats
 cargo test --manifest-path main/message-broker/saf/Cargo.toml --features kafka
 cargo test --manifest-path main/message-broker/saf/Cargo.toml --features postgres
-cargo test --manifest-path main/message-broker/saf/Cargo.toml --features nats,kafka,postgres
+cargo test --manifest-path main/message-broker/saf/Cargo.toml --features inmemory,nats,kafka,postgres
 ```
+
+`inmemory` needs no external service or live-infra opt-in — unlike the other three
+backends, its tests exercise real publish/subscribe delivery directly.
 
 `kafka`'s `rdkafka` dependency builds `librdkafka` from source via `cmake` on first
 build (`cmake-build` Cargo feature) — the first `cargo build`/`test` touching that crate
@@ -76,8 +81,8 @@ POSTGRES_DSN=postgres://postgres:postgres@localhost:5433/edge_test \
 
 ## No Direct spi Import Outside saf
 
-Enforced, not a style preference: `NatsMessageBroker`/`KafkaMessageBroker`/
-`PostgresMessageBroker` are `pub` within their own `spi` crates (required for
+Enforced, not a style preference: `InMemoryMessageBroker`/`NatsMessageBroker`/
+`KafkaMessageBroker`/`PostgresMessageBroker` are `pub` within their own `spi` crates (required for
 `message-broker-svc-saf` to construct them across the crate boundary), but `saf`'s own
 `lib.rs` re-exports only `MessageBrokerFactory` — a consumer depending on
 `message-broker-svc-saf` alone cannot name a concrete backend type without also
@@ -88,7 +93,7 @@ depending directly on that `spi` crate itself.
 There is no `BackendKind` enum, no shared `MessageBrokerConfig` struct, and no
 `from_config` dispatch anywhere in this repo — see `architecture.md`'s own section on
 this and ADR-001's amendment for the full reasoning. Each `spi` crate defines its own
-local config type (`NatsConfig`/`KafkaConfig`/`PostgresConfig`), implementing both
+local config type (`InMemoryConfig`/`NatsConfig`/`KafkaConfig`/`PostgresConfig`), implementing both
 `configbuilder::OptionalSection` and `message-broker-pattern::Validator` independently.
 Adding a new backend means adding a new `spi` crate with its own config type and a new
 `MessageBrokerFactory` constructor — never touching a shared enum or struct, because
@@ -118,10 +123,13 @@ in a separate repo with no tag cut yet.
 ## Scope
 
 See `architecture.md`'s Scope boundary section before adding anything here that isn't a
-`MessageBroker` implementation — `TaskQueue`, `ApplicationConfig`/`BrokerProvider`, and
-the real, `tokio::sync::broadcast`-backed in-memory backend were all deliberately left
-out of this extraction. `NoopMessageBroker` (in `-saf`) is this repo's own no-op
-reference implementation, not that real in-memory backend.
+`MessageBroker` implementation — `TaskQueue` and `ApplicationConfig`/`BrokerProvider`
+(the `BackendKind`-driven `from_config` dispatch mechanism itself) are deliberately left
+out of this extraction. The real, `tokio::sync::broadcast`-backed in-memory backend
+*was* initially left out too, on a mistaken belief that nothing depended on it — it now
+ships here as `message-broker-svc-inmemory-spi`; see architecture.md's "Restoring the
+real in-memory backend" section. `NoopMessageBroker` (in `-saf`) remains this repo's
+own no-op reference implementation, distinct from the real in-memory backend.
 
 ## See Also
 

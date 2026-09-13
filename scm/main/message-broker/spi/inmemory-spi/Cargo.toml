@@ -1,0 +1,40 @@
+[package]
+name         = "message-broker-svc-inmemory-spi"
+version      = "0.1.0"
+edition      = "2021"
+license      = "MIT OR Apache-2.0"
+authors      = ["SWE Engineering Labs"]
+repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
+rust-version = "1.98"
+description  = "message-broker-svc in-memory SPI: tokio::sync::broadcast-backed MessageBroker implementation. Restores the real in-memory backend edge-runtime's runtime-message-broker-core shipped, closing the gap left by this repo's initial MessageBroker-only extraction."
+keywords     = ["message-broker", "in-memory", "spi", "async", "swe"]
+categories   = ["network-programming", "asynchronous"]
+
+[package.metadata.arch]
+application_type = "adapter"
+service_type     = "message-broker"
+
+[lib]
+name = "message_broker_svc_inmemory_spi"
+path = "src/lib.rs"
+
+[dependencies]
+message-broker-pattern    = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-svc-core   = { path = "../../core", version = "0.1.0" }
+configbuilder = "0.8"
+serde         = { version = "1.0", features = ["derive"] }
+futures       = "0.3"
+tokio         = { version = "1.52", features = ["sync"] }
+
+[dev-dependencies]
+tokio    = { version = "1.52", features = ["rt-multi-thread", "macros"] }
+futures  = "0.3"
+tempfile = "3.27"
+
+[lints.rust]
+unsafe_code  = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

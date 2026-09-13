@@ -9,6 +9,8 @@
 //! building a registry, not the "-svc represents exactly one implementation"
 //! shape this factory offers -- see `runtime-svc-registry` for that.
 
+#[cfg(feature = "inmemory")]
+use message_broker_svc_inmemory_spi::InMemoryMessageBroker;
 #[cfg(feature = "kafka")]
 use message_broker_svc_kafka_spi::KafkaMessageBroker;
 #[cfg(feature = "nats")]
@@ -16,7 +18,9 @@ use message_broker_svc_nats_spi::NatsMessageBroker;
 #[cfg(feature = "postgres")]
 use message_broker_svc_postgres_spi::PostgresMessageBroker;
 
-use message_broker_pattern::{BrokerError, MessageBroker};
+#[cfg(any(feature = "kafka", feature = "nats", feature = "postgres"))]
+use message_broker_pattern::BrokerError;
+use message_broker_pattern::MessageBroker;
 
 use crate::noop_message_broker::NoopMessageBroker;
 
@@ -28,10 +32,25 @@ impl MessageBrokerFactory {
     ///
     /// Publishing discards the message and subscribing yields an empty stream.
     /// Intended for tests and as a safe default; production deployments use
-    /// [`MessageBrokerFactory::nats`]/[`MessageBrokerFactory::kafka`]/
-    /// [`MessageBrokerFactory::postgres`] instead.
+    /// [`MessageBrokerFactory::in_memory`]/[`MessageBrokerFactory::nats`]/
+    /// [`MessageBrokerFactory::kafka`]/[`MessageBrokerFactory::postgres`] instead.
     pub fn noop() -> Box<dyn MessageBroker> {
         Box::new(NoopMessageBroker)
+    }
+
+    /// Construct a real, in-process pub/sub broker backed by
+    /// [`tokio::sync::broadcast`].
+    ///
+    /// Unlike [`MessageBrokerFactory::noop`], published messages are actually
+    /// delivered to every active subscriber of the same topic, in the same
+    /// process. Topics are created lazily on first subscription. No external
+    /// service or network connection is required, so this constructor never
+    /// fails.
+    ///
+    /// Requires the `inmemory` feature.
+    #[cfg(feature = "inmemory")]
+    pub fn in_memory() -> Box<dyn MessageBroker> {
+        Box::new(InMemoryMessageBroker::new())
     }
 
     /// Connect to a Kafka cluster and return a broker handle.

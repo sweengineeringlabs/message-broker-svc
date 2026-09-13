@@ -1,6 +1,7 @@
 # message-broker-svc
 
-> **TLDR:** Concrete NATS/Kafka/Postgres `MessageBroker` implementations on top of
+> **TLDR:** Concrete in-memory/NATS/Kafka/Postgres `MessageBroker` implementations on
+> top of
 > [`message-broker-pattern`](https://github.com/sweengineeringlabs/message-broker-pattern)'s
 > contract. See [Architecture](docs/3-design/architecture.md) for the full design.
 
@@ -22,25 +23,30 @@ let broker = MessageBrokerFactory::nats("nats://localhost:4222").await?;
 
 | Crate | What it is |
 |-------|------------|
+| [`message-broker-svc-inmemory-spi`](scm/main/message-broker/spi/inmemory-spi) | `InMemoryMessageBroker` — `tokio::sync::broadcast`-backed |
 | [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | `NatsMessageBroker` — `async-nats`-backed |
 | [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | `KafkaMessageBroker` — `rdkafka`-backed |
 | [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | `PostgresMessageBroker` — `pgmq`-backed |
 | [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — the construction/dispatch facade consumers depend on |
 
 No `BackendKind` enum, no shared config struct, no `from_config` dispatch — each `spi`
-crate owns its own config type (`NatsConfig`/`KafkaConfig`/`PostgresConfig`), and
-`MessageBrokerFactory` exposes four independent, directly-typed constructors
-(`noop`/`nats`/`kafka`/`postgres`), not a runtime-selectable registry. See
+crate owns its own config type (`InMemoryConfig`/`NatsConfig`/`KafkaConfig`/`PostgresConfig`),
+and `MessageBrokerFactory` exposes five independent, directly-typed constructors
+(`noop`/`in_memory`/`nats`/`kafka`/`postgres`), not a runtime-selectable registry. See
 [Architecture](docs/3-design/architecture.md) for why.
 
 **Scope note:** this repo covers only `message-broker-pattern`'s `MessageBroker` trait.
 `edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
 (`runtime-message-broker-contract`, a superset) and an `ApplicationConfig`/`BrokerProvider`
-composition layer — neither was ported here; they remain `edge-runtime`-specific concerns
-until a similar extraction is scoped for them separately. The real,
-`tokio::sync::broadcast`-backed in-memory backend is not part of this repo either —
-`MessageBrokerFactory::noop()` is this repo's own no-op reference implementation, not
-that.
+composition layer (including the `BackendKind`-driven `from_config` dispatch mechanism
+itself) — neither was ported here; they remain `edge-runtime`-specific concerns until a
+similar extraction is scoped for them separately. The real,
+`tokio::sync::broadcast`-backed in-memory backend *is* part of this repo, as
+`message-broker-svc-inmemory-spi` — initially left out alongside the above on a mistaken
+belief that nothing depended on it, restored once checking `edge-runtime`'s actual source
+showed it does (see [Architecture](docs/3-design/architecture.md)).
+`MessageBrokerFactory::noop()` remains this repo's own no-op reference implementation,
+distinct from the real in-memory backend.
 
 ## Documentation
 

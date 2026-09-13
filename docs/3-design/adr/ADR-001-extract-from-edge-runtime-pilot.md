@@ -280,4 +280,88 @@ Verified: `cargo test --workspace --all-targets --features nats,kafka,postgres` 
 `cargo fmt --check` and `cargo clippy --workspace --all-targets --features
 nats,kafka,postgres -- -D warnings` both clean.
 
+## Amendment: 2026-09-13 -- restore the real in-memory backend
+
+This ADR's original Consequences section stated the real, `tokio::sync::broadcast`-backed
+in-memory backend was deliberately not ported, on the belief that
+`BackendKind`/`MessageBrokerConfig` (the vocabulary that selected it) had no real
+consumer outside `edge-message-broker` itself. That belief was wrong, and was corrected
+by reading `edge-runtime`'s actual source rather than trusting the doc comment that
+prompted it:
+
+- `edge-runtime`'s `runtime-message-broker-contract` crate re-exports
+  `swe_edge_message_broker::{BackendKind, MessageBrokerConfig}` directly
+  (`types/mod.rs`).
+- `edge-runtime`'s `runtime-message-broker-saf` crate has a real, currently-working
+  `MessageBrokerFactory::from_config(&MessageBrokerConfig) -> Result<Box<dyn
+  MessageBroker>, BrokerError>` and `impl BrokerProvider for MessageBrokerFactory`, both
+  matching on `config.backend` to dispatch to one of four real backends -- including
+  its own real `InMemoryMessageBroker` (`runtime-message-broker-core`).
+- This is pinned via a live git dependency:
+  `swe-edge-message-broker = { git = "...", tag = "v0.3.8" }` in
+  `runtime-message-broker-saf`'s own `Cargo.toml`.
+
+So the in-memory backend was not dead vocabulary nobody used -- it is live
+functionality `edge-runtime` depends on today. Removing `BackendKind` (correctly, as an
+anti-pattern -- see the first amendment above) without restoring the *implementation*
+it used to select would have been a real functional regression relative to
+`edge-message-broker`, not merely a naming cleanup.
+
+**Decision**: added `message-broker-svc-inmemory-spi`, porting `edge-runtime`'s
+`InMemoryMessageBroker` 1:1 (topic length/emptiness checks, bounded broadcast channels
+via `DEFAULT_CHANNEL_CAPACITY`, lazy per-topic channel creation, `StreamLagged` on
+receiver lag) -- not reinvented, faithfully copied and re-verified against the
+`message-broker-pattern` types this repo already uses. `InMemoryConfig` (zero fields --
+this backend takes no runtime parameters) implements `Validator`/`OptionalSection` the
+same shape as every other `spi` crate's config, for the same reason: `MessageBroker::
+validator()` needs a return value, and an empty `[message_broker]` section's
+presence/absence still has real, `deny_unknown_fields`-enforced meaning.
+`MessageBrokerFactory` gains `in_memory()` (infallible -- no external service, so it
+never fails), feature-gated behind a new `inmemory` Cargo feature, same shape as
+`nats`/`kafka`/`postgres`.
+
+**What is deliberately still not restored**: the `BackendKind`-driven `from_config`/
+`BrokerProvider` dispatch mechanism itself. Its correct home is a
+`runtime-svc-registry`-based composition layer built on top of this repo's independent
+constructors, in `edge-runtime`'s own repo -- reintroducing a `BackendKind`-shaped enum
+here to restore it would undo the correctly-identified anti-pattern removal from this
+ADR's first amendment. `edge-message-broker#6`'s own E3 already tracks updating
+`edge-runtime#96`'s pilot scope to depend on this repo instead of its own divergent
+in-tree copy and the still-live `swe-edge-message-broker` git-tag dependency -- not
+resolved by this amendment, which closes only the backend-implementation gap.
+
+**A false positive found and accepted, not worked around**: `arch audit`'s
+`no_mocks_in_integration` rule flags 8 lines in `inmemory_config_int_test.rs`, all
+referencing `InMemoryConfig`, as "Mock type usage detected". Verified via direct
+bisection (renaming the type in a scratch copy and re-running the audit) that the
+trigger is structural -- any identifier matching `In[A-Z]\w+` (an "In-something"
+CamelCase prefix, e.g. `InMemoryConfig`, `InMemoryThing`) fires the rule regardless of
+whether it is an actual mock; `InMemory` alone, or `InMemory` + a digit, or `Memory`
+without the `In` prefix, does not. This is a real tool limitation, not a defect in this
+crate: `InMemory*` is both a common test-double naming convention *and* the accurate,
+precedent-matching name for this repo's real, production in-memory backend (matching
+`edge-runtime`'s own real type name exactly). Renaming the type to dodge the false
+positive would trade naming accuracy for a clean audit count -- rejected. No local
+`architecture.policy.toml` exists in this repo to add a `[config.rule_exemptions]`
+entry (the tool's own suggested fix for exactly this case); accepted as a documented
+exception, matching this repo's established pattern for every other tool limitation
+found so far (`package_name_no_sea_suffix`, `security_dependency_audit_configured`,
+etc.).
+
+**Consequences**: `message-broker-svc-saf`'s `Cargo.toml` gains an `inmemory` feature
+and an optional dependency on `message-broker-svc-inmemory-spi`, same shape as
+`nats`/`kafka`/`postgres`. `deps_have_integration_tests`/`package_name_no_sea_suffix`/
+`security_dependency_audit_configured` all fire on the new crate too, matching the
+same already-accepted category every other `spi` crate already has.
+
+Verified: `cargo test --workspace --all-targets --features inmemory,nats,kafka,postgres`
+clean (17 new tests in `message-broker-svc-inmemory-spi` alone: 10 inline in
+`inmemory_message_broker.rs` including real publish/subscribe/fan-out round-trips no
+live infrastructure is required for, 7 in `inmemory_config_int_test.rs`; 3 more in
+`-saf`'s own `inmemory_message_broker_int_test.rs`). `cargo fmt --check` and `cargo
+clippy --workspace --all-targets --features inmemory,nats,kafka,postgres -- -D
+warnings` both clean. `arch audit .` from `scm/`: 599 passed, 9 failed across 6
+members -- every failing rule matches an already-documented accepted category except
+the one new, verified-false-positive `no_mocks_in_integration` finding described above.
+
 [← Docs index](../../README.md)
