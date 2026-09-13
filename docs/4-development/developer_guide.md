@@ -28,10 +28,15 @@ message-broker-svc/
 - `dev` is the default branch; all work lands there first.
 - `main` gets fast-forwarded to `dev` after a shipped change, not on every commit.
 - Pre-1.0 SemVer: a breaking change bumps the minor version.
-- Not yet tagged or published to crates.io. Depends on
-  [`message-broker-pattern`](https://github.com/sweengineeringlabs/message-broker-pattern)
-  via `git`, `branch = "dev"`, for the same reason — pin both to a tag once
-  `message-broker-pattern` cuts one.
+- All six crates published to crates.io: [`message-broker-svc-core`](https://crates.io/crates/message-broker-svc-core),
+  [`-inmemory-spi`](https://crates.io/crates/message-broker-svc-inmemory-spi),
+  [`-nats-spi`](https://crates.io/crates/message-broker-svc-nats-spi),
+  [`-kafka-spi`](https://crates.io/crates/message-broker-svc-kafka-spi),
+  [`-postgres-spi`](https://crates.io/crates/message-broker-svc-postgres-spi),
+  [`-saf`](https://crates.io/crates/message-broker-svc-saf), each v0.1.0. Depends on
+  [`message-broker-pattern`](https://crates.io/crates/message-broker-pattern) `"0.1.0"` by
+  version, not `git`. Not yet tagged in this repo's own git history — a `v0.1.0` tag
+  should follow.
 
 ## Working on Any Crate
 
