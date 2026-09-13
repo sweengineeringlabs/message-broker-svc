@@ -17,6 +17,13 @@ use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
 
 /// NATS backend configuration: the `[message_broker]` TOML section shape for
 /// a NATS-backed deployment.
+///
+/// # Examples
+///
+/// ```toml
+/// [message_broker]
+/// url = "nats://nats.internal:4222"
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NatsConfig {

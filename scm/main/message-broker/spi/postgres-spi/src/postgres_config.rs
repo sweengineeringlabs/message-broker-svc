@@ -12,6 +12,14 @@ use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
 
 /// Postgres backend configuration: the `[message_broker]` TOML section shape
 /// for a `pgmq`-backed deployment.
+///
+/// # Examples
+///
+/// ```toml
+/// [message_broker]
+/// url        = "postgres://user:pass@localhost/app"
+/// queue_name = "edge_events"
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {

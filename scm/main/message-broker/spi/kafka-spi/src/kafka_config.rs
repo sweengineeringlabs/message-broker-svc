@@ -12,6 +12,14 @@ use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
 
 /// Kafka backend configuration: the `[message_broker]` TOML section shape for
 /// a Kafka-backed deployment.
+///
+/// # Examples
+///
+/// ```toml
+/// [message_broker]
+/// url      = "kafka-broker-1:9092,kafka-broker-2:9092"
+/// group_id = "my-service"
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaConfig {

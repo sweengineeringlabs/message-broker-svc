@@ -23,6 +23,12 @@ use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
 /// In-memory backend configuration: the `[message_broker]` TOML section shape
 /// for an in-process, no-external-dependency deployment. Carries no fields --
 /// this backend takes no runtime parameters.
+///
+/// # Examples
+///
+/// ```toml
+/// [message_broker]
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InMemoryConfig {}
