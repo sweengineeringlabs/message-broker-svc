@@ -58,8 +58,8 @@ impl MessageBrokerFactory {
     ///
     /// Requires the `kafka` feature.
     #[cfg(feature = "kafka")]
-    pub fn kafka(brokers: &str, group_id: &str) -> Result<impl MessageBroker, BrokerError> {
-        KafkaMessageBroker::new(brokers, group_id)
+    pub fn kafka(brokers: &str, group_id: &str) -> Result<Box<dyn MessageBroker>, BrokerError> {
+        Ok(Box::new(KafkaMessageBroker::new(brokers, group_id)?))
     }
 
     /// Connect to a NATS server and return a broker handle.
@@ -70,8 +70,8 @@ impl MessageBrokerFactory {
     ///
     /// Requires the `nats` feature.
     #[cfg(feature = "nats")]
-    pub async fn nats(url: &str) -> Result<impl MessageBroker, BrokerError> {
-        NatsMessageBroker::connect(url).await
+    pub async fn nats(url: &str) -> Result<Box<dyn MessageBroker>, BrokerError> {
+        Ok(Box::new(NatsMessageBroker::connect(url).await?))
     }
 
     /// Connect to Postgres and return a `pgmq`-backed broker handle.
@@ -90,7 +90,12 @@ impl MessageBrokerFactory {
     ///
     /// Requires the `postgres` feature.
     #[cfg(feature = "postgres")]
-    pub async fn postgres(dsn: &str, queue_name: &str) -> Result<impl MessageBroker, BrokerError> {
-        PostgresMessageBroker::connect(dsn, queue_name).await
+    pub async fn postgres(
+        dsn: &str,
+        queue_name: &str,
+    ) -> Result<Box<dyn MessageBroker>, BrokerError> {
+        Ok(Box::new(
+            PostgresMessageBroker::connect(dsn, queue_name).await?,
+        ))
     }
 }

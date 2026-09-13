@@ -5,8 +5,9 @@
 Five crates — one shared `core`, three `spi` providers, and one `saf` facade:
 
 - **`message-broker-svc-core`** — generic implementation code every `spi` crate depends
-  on, exploiting `message-broker-pattern`'s own `Validator` trait bound directly
-  (`validate_config<C: Validator>`). See "Why `core` exists" below.
+  on, exploiting `message-broker-pattern`'s own `Validator` trait bound directly:
+  `validate_config<C: Validator>` and `validator_response<C: Validator>`. See "Why
+  `core` exists" below.
 - **`message-broker-svc-nats-spi`** — `NatsMessageBroker` (`async-nats`) + `NatsConfig`
   (this crate's own `[message_broker]` TOML config shape: `url`).
 - **`message-broker-svc-kafka-spi`** — `KafkaMessageBroker` (`rdkafka`) + `KafkaConfig`
@@ -53,6 +54,19 @@ three different ways: NATS hand-rolled its own empty-`url` check, Kafka and Post
 validated nothing at all. Adding a fourth backend later means implementing `Validator`
 on its own config type and calling this one function — not inventing a fourth approach.
 
+A comprehensive pass over every `MessageBroker` method (checking each against "is this
+forced to be technology-specific, or is it duplicated logic that only touches
+`message-broker-pattern`'s own types?") found a second case: every implementor's
+`validator()` body — `NatsMessageBroker`, `KafkaMessageBroker`, `PostgresMessageBroker`,
+`NoopMessageBroker` — was the byte-for-byte identical one-liner
+`Arc::clone(&self.config) as Arc<dyn Validator>`, wrapped in `ValidatorResponse`. `core`
+now provides `validator_response<C: Validator>(config: &Arc<C>) -> ValidatorResponse`;
+every implementor's `validator()` is one line calling it. `publish`/`subscribe`/
+`health_check` were checked the same way and found genuinely forced to be concrete —
+each talks to a different wire protocol (`async-nats`, `rdkafka`, `sqlx`/`pgmq`) with no
+shared algorithm underneath to extract, unlike `validate_config`/`validator_response`
+which touch only `message-broker-pattern`'s own vocabulary.
+
 ## Config: each `spi` crate owns its own, none shared
 
 There is no crate-spanning "which backend" type anywhere in this repo — no enum, no
@@ -88,7 +102,7 @@ flowchart TD
     end
 
     subgraph svc["message-broker-svc"]
-        core["message-broker-svc-core<br/>validate_config&lt;C: Validator&gt;"]
+        core["message-broker-svc-core<br/>validate_config, validator_response"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory, NoopMessageBroker"]
         nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsConfig"]
         kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaConfig"]
@@ -119,6 +133,19 @@ them together, and no runtime branch picks among several compiled-in backends by
 A given build of this crate compiles in whichever features are turned on; the caller
 already knows, at the point they write the one line calling a specific constructor,
 which backend that build is for.
+
+All four return `Box<dyn MessageBroker>` — not three returning opaque
+`impl MessageBroker` and one (`noop`) returning `Box<dyn MessageBroker>`, which is what
+this looked like before an audit pass caught the inconsistency. `impl Trait` in return
+position is a distinct anonymous type per function; a caller who picks a backend at
+runtime (`if cfg.backend == "kafka" { ... } else { MessageBrokerFactory::noop() }`)
+could not have unified three of these four constructors into one variable without
+manually boxing them itself — the trait was supposed to hide exactly that construction
+detail, but three call sites leaked it anyway. Fixed uniformly; every constructor's
+result now behaves identically as far as the caller is concerned, and
+`message_broker_factory_int_test.rs::test_kafka_and_noop_constructors_return_the_same_boxed_broker_type`
+is a real regression test for it — before this fix, that test's own `Vec<Box<dyn
+MessageBroker>>` literal would have failed to *compile*, not just to pass.
 
 **This is deliberate, not an oversight.** A `from_config` that matches on a
 "which-backend" value and constructs the matching one of several compiled-in

@@ -183,4 +183,50 @@ per backend in `-saf`'s existing integration test files). `cargo fmt --check` an
 both clean. `arch audit .` from `scm/`: 505 passed, 7 failed across 5 members — all 7
 matching an already-documented accepted category, none new defects.
 
+## Amendment: 2026-09-13 -- comprehensive method-by-method audit, two more findings
+
+At the user's request, a genuinely comprehensive pass: every method on every
+`MessageBroker` implementor, checked against "is this forced to be concrete (a real
+wire-protocol detail), or is it duplicated logic that only touches
+`message-broker-pattern`'s own vocabulary?" -- with the added constraint that nothing
+gets removed, only maximized toward the contract.
+
+**Finding 1 -- `validator()` was duplicated, not just `validate_config`.** Every
+implementor's `validator()` body -- `NatsMessageBroker`, `KafkaMessageBroker`,
+`PostgresMessageBroker`, `NoopMessageBroker` -- was the identical one-liner
+(`Arc::clone(&self.config) as Arc<dyn Validator>`, wrapped in `ValidatorResponse`).
+Same shape as the earlier `validate_config` finding, just missed the first time.
+Added `message-broker-svc-core::validator_response<C: Validator>(config: &Arc<C>) ->
+ValidatorResponse`; every implementor's `validator()` is now one line calling it.
+`publish`/`subscribe`/`health_check` were checked the same way and are genuinely
+forced to be concrete -- each talks to a different wire protocol with no shared
+algorithm to extract.
+
+**Finding 2 -- the four `MessageBrokerFactory` constructors returned two different
+types.** `noop()` returned `Box<dyn MessageBroker>`; `nats`/`kafka`/`postgres` returned
+`impl MessageBroker`. `impl Trait` in return position is a distinct anonymous type per
+function -- a caller picking a backend at runtime (`if cfg.backend == "kafka" { ... }
+else { MessageBrokerFactory::noop() }`) could not unify three of these four
+constructors into one variable without boxing them itself first. The whole point of a
+factory returning `impl MessageBroker`/`Box<dyn MessageBroker>` is that the caller
+never has to think about which concrete backend it got -- three call sites quietly
+broke that. Fixed: all four now return `Box<dyn MessageBroker>` (the three fallible
+ones as `Result<Box<dyn MessageBroker>, BrokerError>`). A real regression test
+(`test_kafka_and_noop_constructors_return_the_same_boxed_broker_type`) puts both in one
+`Vec<Box<dyn MessageBroker>>` -- before this fix, that literal would have failed to
+*compile*, not just to pass.
+
+**Consequences**: `message-broker-svc-saf` gained a dependency on
+`message-broker-svc-core` (previously only the three `spi` crates depended on it) for
+`NoopMessageBroker::validator()` to reuse `validator_response` too -- every
+`MessageBroker` implementor in this repo, including the reference one, now goes
+through the same shared helper, no exception.
+
+Verified: `cargo test --workspace --all-targets --features nats,kafka,postgres` clean
+(4 new tests: `core`'s own 2 for `validator_response`, plus the new type-unification
+regression test in `-saf`). `cargo fmt --check` and `cargo clippy --workspace
+--all-targets --features nats,kafka,postgres -- -D warnings` both clean. `arch audit .`
+from `scm/`: 505 passed, 7 failed across 5 members -- same accepted category as before,
+none new.
+
 [← Docs index](../../README.md)

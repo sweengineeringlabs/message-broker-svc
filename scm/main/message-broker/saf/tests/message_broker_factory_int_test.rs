@@ -40,6 +40,26 @@ async fn test_noop_publish_then_subscribe_is_inert() {
     );
 }
 
+/// @covers: noop, kafka — both return `Box<dyn MessageBroker>`, so a caller
+/// can unify brokers picked from different constructors into one `Vec`
+/// (or one `if`/`else` branch) without manually boxing any of them itself.
+/// Before `kafka` returned this same boxed type, this test would fail to
+/// *compile*, not just fail to pass: `impl MessageBroker` is a distinct
+/// anonymous type per call site, not assignable alongside `noop()`'s
+/// `Box<dyn MessageBroker>` in one `Vec`.
+#[cfg(feature = "kafka")]
+#[test]
+fn test_kafka_and_noop_constructors_return_the_same_boxed_broker_type() {
+    use message_broker_pattern::MessageBroker;
+
+    let brokers: Vec<Box<dyn MessageBroker>> = vec![
+        MessageBrokerFactory::noop(),
+        MessageBrokerFactory::kafka("127.0.0.1:9999", "test-group")
+            .expect("kafka client construction succeeds before first IO"),
+    ];
+    assert_eq!(brokers.len(), 2);
+}
+
 /// @covers: validate — delegates to the value's own Validator::validate
 #[test]
 fn test_validate_ok_for_valid_type_happy() {

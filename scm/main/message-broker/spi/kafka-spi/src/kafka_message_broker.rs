@@ -22,7 +22,6 @@ use message_broker_pattern::MessageStream;
 use message_broker_pattern::PublishRequest;
 use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
-use message_broker_pattern::Validator;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
 
@@ -277,9 +276,7 @@ impl MessageBroker for KafkaMessageBroker {
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
-        Ok(ValidatorResponse {
-            validator: Arc::clone(&self.config) as Arc<dyn Validator>,
-        })
+        Ok(message_broker_svc_core::validator_response(&self.config))
     }
 }
 

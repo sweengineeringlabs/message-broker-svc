@@ -12,5 +12,7 @@
 //! becomes real.
 
 mod config_validation;
+mod validator_handle;
 
 pub use config_validation::validate_config;
+pub use validator_handle::validator_response;
