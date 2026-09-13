@@ -1,12 +1,12 @@
 [package]
-name         = "message-broker-pattern-kafka-spi"
+name         = "message-broker-svc-kafka-spi"
 version      = "0.1.0"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
 repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
 rust-version = "1.98"
-description  = "message-broker-pattern Kafka SPI: rdkafka-backed MessageBroker implementation. Extracted from edge-runtime's runtime-message-broker-kafka-spi per edge-message-broker#6."
+description  = "message-broker-svc Kafka SPI: rdkafka-backed MessageBroker implementation. Extracted from edge-runtime's runtime-message-broker-kafka-spi per edge-message-broker#6."
 keywords     = ["message-broker", "kafka", "spi", "async", "swe"]
 categories   = ["network-programming", "asynchronous"]
 
@@ -15,7 +15,7 @@ application_type = "adapter"
 service_type     = "message-broker"
 
 [lib]
-name = "message_broker_pattern_kafka_spi"
+name = "message_broker_svc_kafka_spi"
 path = "src/lib.rs"
 
 [dependencies]

@@ -1,4 +1,4 @@
-# message-broker-pattern-nats-spi
+# message-broker-svc-nats-spi
 
 `NatsMessageBroker`: NATS-backed implementation of `message-broker-pattern-contract`'s
 `MessageBroker` trait, via `async-nats`.

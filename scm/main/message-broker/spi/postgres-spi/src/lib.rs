@@ -1,4 +1,4 @@
-//! `message_broker_pattern_postgres_spi` — Postgres (`pgmq`) implementation of
+//! `message_broker_svc_postgres_spi` — Postgres (`pgmq`) implementation of
 //! `message-broker-pattern-contract`'s `MessageBroker` trait.
 //!
 //! Consumed only by `message-broker-svc-saf`.

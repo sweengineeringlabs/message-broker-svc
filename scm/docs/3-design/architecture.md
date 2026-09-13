@@ -4,13 +4,13 @@
 
 Four crates — three `spi` providers and one `saf` facade:
 
-- **`message-broker-pattern-nats-spi`** (`scm/main/message-broker/spi/nats-spi`) —
+- **`message-broker-svc-nats-spi`** (`scm/main/message-broker/spi/nats-spi`) —
   `NatsMessageBroker`, backed by `async-nats`.
-- **`message-broker-pattern-kafka-spi`** (`scm/main/message-broker/spi/kafka-spi`) —
+- **`message-broker-svc-kafka-spi`** (`scm/main/message-broker/spi/kafka-spi`) —
   `KafkaMessageBroker`, backed by `rdkafka`. Each `subscribe()` call derives its own
   unique consumer-group ID so multiple subscribers fan out (pub/sub) rather than
   compete for partitions (Kafka's native behavior within one group).
-- **`message-broker-pattern-postgres-spi`** (`scm/main/message-broker/spi/postgres-spi`) —
+- **`message-broker-svc-postgres-spi`** (`scm/main/message-broker/spi/postgres-spi`) —
   `PostgresMessageBroker`, backed by `sqlx` + the `pgmq` Postgres extension. Delivery is
   **queue** semantics (one consumer per message), not broadcast — the one backend here
   that doesn't fan out.
@@ -37,9 +37,9 @@ flowchart TD
 
     subgraph svc["message-broker-svc"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory"]
-        nats["message-broker-pattern-nats-spi<br/>NatsMessageBroker"]
-        kafka["message-broker-pattern-kafka-spi<br/>KafkaMessageBroker"]
-        postgres["message-broker-pattern-postgres-spi<br/>PostgresMessageBroker"]
+        nats["message-broker-svc-nats-spi<br/>NatsMessageBroker"]
+        kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker"]
+        postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker"]
 
         nats -->|implements| contract
         kafka -->|implements| contract

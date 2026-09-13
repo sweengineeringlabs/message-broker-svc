@@ -9,7 +9,7 @@
 //! `POSTGRES_DSN=... cargo test --features postgres -- --include-ignored`.
 //!
 //! Direct-dep coverage for `sqlx` itself lives in
-//! `message-broker-pattern-postgres-spi`'s own `tests/sqlx_int_test.rs`.
+//! `message-broker-svc-postgres-spi`'s own `tests/sqlx_int_test.rs`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

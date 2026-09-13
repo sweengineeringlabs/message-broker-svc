@@ -1,12 +1,12 @@
 [package]
-name         = "message-broker-pattern-nats-spi"
+name         = "message-broker-svc-nats-spi"
 version      = "0.1.0"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
 repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
 rust-version = "1.98"
-description  = "message-broker-pattern NATS SPI: async-nats-backed MessageBroker implementation. Extracted from edge-runtime's runtime-message-broker-nats-spi per edge-message-broker#6."
+description  = "message-broker-svc NATS SPI: async-nats-backed MessageBroker implementation. Extracted from edge-runtime's runtime-message-broker-nats-spi per edge-message-broker#6."
 keywords     = ["message-broker", "nats", "spi", "async", "swe"]
 categories   = ["network-programming", "asynchronous"]
 
@@ -15,7 +15,7 @@ application_type = "adapter"
 service_type     = "message-broker"
 
 [lib]
-name = "message_broker_pattern_nats_spi"
+name = "message_broker_svc_nats_spi"
 path = "src/lib.rs"
 
 [dependencies]

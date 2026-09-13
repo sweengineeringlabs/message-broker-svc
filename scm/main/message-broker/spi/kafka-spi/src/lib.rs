@@ -1,4 +1,4 @@
-//! `message_broker_pattern_kafka_spi` — Apache Kafka implementation of
+//! `message_broker_svc_kafka_spi` — Apache Kafka implementation of
 //! `message-broker-pattern-contract`'s `MessageBroker` trait.
 //!
 //! Consumed only by `message-broker-svc-saf`.

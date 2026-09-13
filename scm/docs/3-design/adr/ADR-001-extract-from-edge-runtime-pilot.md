@@ -27,7 +27,7 @@ Extract the `MessageBroker`-only portion of that pilot into this repo, rather th
 rebuild from scratch:
 
 - `runtime-message-broker-{nats,kafka,postgres}-spi` → this repo's
-  `message-broker-pattern-{nats,kafka,postgres}-spi`, each renamed to depend on
+  `message-broker-svc-{nats,kafka,postgres}-spi`, each renamed to depend on
   `message-broker-pattern-contract`/`-core` (the plain `MessageBroker` contract) instead
   of `runtime-message-broker-contract` (the `TaskQueue`-superset one).
 - `runtime-message-broker-saf` → this repo's `message-broker-svc-saf`, trimmed to

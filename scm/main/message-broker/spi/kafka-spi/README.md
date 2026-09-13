@@ -1,4 +1,4 @@
-# message-broker-pattern-kafka-spi
+# message-broker-svc-kafka-spi
 
 `KafkaMessageBroker`: Apache Kafka-backed implementation of
 `message-broker-pattern-contract`'s `MessageBroker` trait, via `rdkafka`.

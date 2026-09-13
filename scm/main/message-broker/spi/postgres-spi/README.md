@@ -1,4 +1,4 @@
-# message-broker-pattern-postgres-spi
+# message-broker-svc-postgres-spi
 
 `PostgresMessageBroker`: `pgmq`-backed implementation of
 `message-broker-pattern-contract`'s `MessageBroker` trait, via `sqlx`.

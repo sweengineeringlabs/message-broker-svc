@@ -13,9 +13,9 @@ message-broker-svc/
 │   │   └── 4-development/developer_guide.md     # this file
 │   └── main/message-broker/
 │       ├── spi/
-│       │   ├── nats-spi/        # message-broker-pattern-nats-spi
-│       │   ├── kafka-spi/       # message-broker-pattern-kafka-spi
-│       │   └── postgres-spi/    # message-broker-pattern-postgres-spi
+│       │   ├── nats-spi/        # message-broker-svc-nats-spi
+│       │   ├── kafka-spi/       # message-broker-svc-kafka-spi
+│       │   └── postgres-spi/    # message-broker-svc-postgres-spi
 │       └── saf/              # message-broker-svc-saf -- MessageBrokerFactory
 ```
 

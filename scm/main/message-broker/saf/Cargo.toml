@@ -20,16 +20,16 @@ path = "src/lib.rs"
 
 [features]
 default  = []
-nats     = ["dep:message-broker-pattern-nats-spi"]
-kafka    = ["dep:message-broker-pattern-kafka-spi"]
-postgres = ["dep:message-broker-pattern-postgres-spi"]
+nats     = ["dep:message-broker-svc-nats-spi"]
+kafka    = ["dep:message-broker-svc-kafka-spi"]
+postgres = ["dep:message-broker-svc-postgres-spi"]
 
 [dependencies]
-message-broker-pattern-contract     = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-pattern-core         = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-pattern-nats-spi     = { path = "../spi/nats-spi", optional = true }
-message-broker-pattern-kafka-spi    = { path = "../spi/kafka-spi", optional = true }
-message-broker-pattern-postgres-spi = { path = "../spi/postgres-spi", optional = true }
+message-broker-pattern-contract  = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-pattern-core      = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-svc-nats-spi      = { path = "../spi/nats-spi", optional = true }
+message-broker-svc-kafka-spi     = { path = "../spi/kafka-spi", optional = true }
+message-broker-svc-postgres-spi  = { path = "../spi/postgres-spi", optional = true }
 configbuilder = "0.8"
 
 [dev-dependencies]

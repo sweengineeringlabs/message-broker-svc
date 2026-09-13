@@ -1,4 +1,4 @@
-//! `message_broker_pattern_nats_spi` — NATS implementation of
+//! `message_broker_svc_nats_spi` — NATS implementation of
 //! `message-broker-pattern-contract`'s `MessageBroker` trait.
 //!
 //! Consumed only by `message-broker-svc-saf`.

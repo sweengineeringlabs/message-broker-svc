@@ -9,11 +9,11 @@
 //! `impl Trait` at call sites.
 
 #[cfg(feature = "kafka")]
-use message_broker_pattern_kafka_spi::KafkaMessageBroker;
+use message_broker_svc_kafka_spi::KafkaMessageBroker;
 #[cfg(feature = "nats")]
-use message_broker_pattern_nats_spi::NatsMessageBroker;
+use message_broker_svc_nats_spi::NatsMessageBroker;
 #[cfg(feature = "postgres")]
-use message_broker_pattern_postgres_spi::PostgresMessageBroker;
+use message_broker_svc_postgres_spi::PostgresMessageBroker;
 
 use configbuilder::ConfigBuilder;
 use message_broker_pattern_contract::{BackendKind, BrokerError, MessageBroker};
