@@ -19,7 +19,7 @@ name = "message_broker_svc_core"
 path = "src/lib.rs"
 
 [dependencies]
-message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
+message-broker-pattern = "0.1.0"
 
 [lints.rust]
 unsafe_code  = "deny"
