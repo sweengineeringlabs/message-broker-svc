@@ -14,9 +14,9 @@ Four crates:
 
 | Crate | What it is |
 |-------|------------|
-| [`message-broker-pattern-nats-spi`](scm/main/message-broker/spi/nats) | `NatsMessageBroker` — `async-nats`-backed |
-| [`message-broker-pattern-kafka-spi`](scm/main/message-broker/spi/kafka) | `KafkaMessageBroker` — `rdkafka`-backed |
-| [`message-broker-pattern-postgres-spi`](scm/main/message-broker/spi/postgres) | `PostgresMessageBroker` — `pgmq`-backed |
+| [`message-broker-pattern-nats-spi`](scm/main/message-broker/spi/nats-spi) | `NatsMessageBroker` — `async-nats`-backed |
+| [`message-broker-pattern-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | `KafkaMessageBroker` — `rdkafka`-backed |
+| [`message-broker-pattern-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | `PostgresMessageBroker` — `pgmq`-backed |
 | [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — the construction/dispatch facade consumers depend on |
 
 ## Documentation

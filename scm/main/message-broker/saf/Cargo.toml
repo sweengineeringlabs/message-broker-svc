@@ -27,9 +27,9 @@ postgres = ["dep:message-broker-pattern-postgres-spi"]
 [dependencies]
 message-broker-pattern-contract     = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
 message-broker-pattern-core         = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", branch = "dev" }
-message-broker-pattern-nats-spi     = { path = "../spi/nats", optional = true }
-message-broker-pattern-kafka-spi    = { path = "../spi/kafka", optional = true }
-message-broker-pattern-postgres-spi = { path = "../spi/postgres", optional = true }
+message-broker-pattern-nats-spi     = { path = "../spi/nats-spi", optional = true }
+message-broker-pattern-kafka-spi    = { path = "../spi/kafka-spi", optional = true }
+message-broker-pattern-postgres-spi = { path = "../spi/postgres-spi", optional = true }
 configbuilder = "0.8"
 
 [dev-dependencies]

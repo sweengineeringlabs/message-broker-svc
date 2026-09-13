@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "main/message-broker/spi/nats",
-    "main/message-broker/spi/kafka",
-    "main/message-broker/spi/postgres",
+    "main/message-broker/spi/*",
     "main/message-broker/saf",
 ]

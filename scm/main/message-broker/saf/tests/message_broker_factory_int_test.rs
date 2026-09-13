@@ -1,15 +1,25 @@
 //! Integration tests for [`MessageBrokerFactory`].
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use configbuilder::BuilderFinalizer;
+use configbuilder::{BuilderFinalizer, FeatureStateOps, OptionalSection};
+use message_broker_pattern_core::MessageBrokerConfig;
 use message_broker_svc_saf::MessageBrokerFactory;
 
-/// @covers: MessageBrokerFactory::create_config_builder
+/// @covers: MessageBrokerFactory::create_config_builder — the built loader is
+/// genuinely usable, not just non-erroring: loading an absent
+/// `[message_broker]` section through it resolves to Disabled rather than
+/// panicking or silently enabling.
 #[test]
 fn test_message_broker_factory_create_config_builder_is_pre_seeded() {
-    let builder = MessageBrokerFactory::create_config_builder();
-    let loader = builder.build_loader();
-    assert!(loader.is_ok(), "builder must construct a valid loader");
+    let loader = MessageBrokerFactory::create_config_builder()
+        .build_loader()
+        .expect("builder must construct a valid loader");
+    let state = MessageBrokerConfig::load_optional(&loader)
+        .expect("an absent section must resolve to Disabled, not an error");
+    assert!(
+        state.is_disabled(),
+        "a builder with no configured directories must resolve every section to Disabled"
+    );
 }
 
 /// @covers: MessageBrokerFactory::from_config — in_memory is not this factory's job.

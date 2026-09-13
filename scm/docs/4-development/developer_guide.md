@@ -6,16 +6,16 @@
 message-broker-svc/
 ├── README.md
 ├── scm/
-│   ├── Cargo.toml          # workspace: [main/message-broker/{spi/nats,spi/kafka,spi/postgres,saf}]
+│   ├── Cargo.toml          # workspace: [main/message-broker/spi/*, main/message-broker/saf]
 │   ├── docs/
 │   │   ├── 3-design/architecture.md
 │   │   ├── 3-design/adr/ADR-001-extract-from-edge-runtime-pilot.md
 │   │   └── 4-development/developer_guide.md     # this file
 │   └── main/message-broker/
 │       ├── spi/
-│       │   ├── nats/        # message-broker-pattern-nats-spi
-│       │   ├── kafka/       # message-broker-pattern-kafka-spi
-│       │   └── postgres/    # message-broker-pattern-postgres-spi
+│       │   ├── nats-spi/        # message-broker-pattern-nats-spi
+│       │   ├── kafka-spi/       # message-broker-pattern-kafka-spi
+│       │   └── postgres-spi/    # message-broker-pattern-postgres-spi
 │       └── saf/              # message-broker-svc-saf -- MessageBrokerFactory
 ```
 
