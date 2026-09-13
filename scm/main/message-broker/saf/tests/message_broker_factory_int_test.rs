@@ -1,4 +1,4 @@
-//! Integration tests for [`MessageBrokerFactory`]'s no-op broker and `validate`.
+//! Integration tests for [`MessageBrokerFactory`]'s no-op broker.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -58,40 +58,4 @@ fn test_kafka_and_noop_constructors_return_the_same_boxed_broker_type() {
             .expect("kafka client construction succeeds before first IO"),
     ];
     assert_eq!(brokers.len(), 2);
-}
-
-/// @covers: validate — delegates to the value's own Validator::validate
-#[test]
-fn test_validate_ok_for_valid_type_happy() {
-    use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
-
-    struct Valid;
-    impl Validator for Valid {
-        fn validate(&self, _request: ValidationRequest) -> Result<(), ValidationError> {
-            Ok(())
-        }
-    }
-    assert_eq!(MessageBrokerFactory::validate(&Valid), Ok(()));
-}
-
-/// @covers: validate — returns err for an invalid type
-#[test]
-fn test_validate_err_for_invalid_type_error() {
-    use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
-
-    struct Invalid;
-    impl Validator for Invalid {
-        fn validate(&self, _request: ValidationRequest) -> Result<(), ValidationError> {
-            Err(ValidationError {
-                violations: vec!["bad state".to_string()],
-            })
-        }
-    }
-    let result = MessageBrokerFactory::validate(&Invalid);
-    assert_eq!(
-        result,
-        Err(ValidationError {
-            violations: vec!["bad state".to_string()],
-        })
-    );
 }

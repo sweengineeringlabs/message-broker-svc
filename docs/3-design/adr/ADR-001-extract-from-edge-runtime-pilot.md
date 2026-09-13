@@ -229,4 +229,55 @@ regression test in `-saf`). `cargo fmt --check` and `cargo clippy --workspace
 from `scm/`: 505 passed, 7 failed across 5 members -- same accepted category as before,
 none new.
 
+## Amendment: 2026-09-13 -- remove MessageBrokerFactory::create_config_builder and ::validate
+
+Two more methods on `MessageBrokerFactory`, checked against the same question as the
+previous amendment ("is this forced to be concrete, or duplicated/redundant logic?"),
+turned out to be neither forced nor reused -- each was `-saf` inventing its own surface
+with nothing behind it beyond what the interface it wrapped already exposed directly:
+
+- **`validate<V: Validator>(v: &V) -> Result<(), ValidationError>`** -- its entire body
+  was `v.validate(ValidationRequest)`, a pure passthrough. `Validator::validate` is
+  already `pub` on the trait; any caller holding a `V: Validator` already had
+  `.validate(ValidationRequest)` directly, with zero difference in behavior. Grep across
+  this repo found exactly one caller of `MessageBrokerFactory::validate` -- its own test,
+  using an ad hoc test double, never a real `NatsConfig`/`KafkaConfig`/`PostgresConfig`.
+- **`create_config_builder() -> configbuilder::ConfigBuilderImpl`** -- returned
+  `configbuilder::ConfigLoaderFactory::create_config_builder()` pre-seeded with this
+  crate's own `CARGO_PKG_NAME`/`CARGO_PKG_VERSION`. Grep found exactly one caller in the
+  whole repo -- its own test, which never depended on *which* name/version was seeded,
+  only that the resulting builder worked. No `spi` crate's `OptionalSection` loading
+  path went through it either -- each builds its own loader directly via
+  `configbuilder::ConfigLoaderFactory::create_loader_for_dir(...)`, bypassing `-saf`
+  entirely.
+
+Both are the same "declare and abandon" shape the earlier `MessageBroker::validator()`
+finding was: implemented, tested in isolation, never chained into a real flow. Removed
+outright rather than kept as decoration -- a `-svc` repo must never carry its own ad hoc
+methods that only restate a capability the interface (`Validator::validate`,
+`configbuilder::ConfigLoaderFactory::create_config_builder()`) already exposes directly;
+"`-svc` must not define new primitives, it must use what `-pattern`/the interface
+already provides" applies as much to redundant convenience wrappers as it does to new
+types.
+
+**Consequences**: `message-broker-svc-saf`'s `Cargo.toml` drops its direct `configbuilder`
+dependency entirely -- nothing in `-saf`'s own source references it any more (only the
+three `spi` crates and `message-broker-svc-core` still depend on the pattern's
+`Validator`/foreign `OptionalSection` machinery). `application_config_builder_int_test.rs`
+deleted outright (tested only the removed method); the two `validate` tests in
+`message_broker_factory_int_test.rs` removed the same way.
+
+A caller that still wants a `-saf`-identity-seeded config builder gets it by calling
+`configbuilder::ConfigLoaderFactory::create_config_builder()` directly and seeding it
+with their own `env!("CARGO_PKG_NAME")`/`env!("CARGO_PKG_VERSION")` -- not `-saf`'s,
+since nothing in this repo ever needed that specific identity. This is the one narrow,
+acknowledged behavioral difference from the removed wrapper; it was never exercised by
+any real code path in this repo (confirmed) or by any other repo on disk depending on
+this crate (also confirmed -- this crate is not yet published, so no external consumer
+exists to be affected either).
+
+Verified: `cargo test --workspace --all-targets --features nats,kafka,postgres` clean.
+`cargo fmt --check` and `cargo clippy --workspace --all-targets --features
+nats,kafka,postgres -- -D warnings` both clean.
+
 [← Docs index](../../README.md)

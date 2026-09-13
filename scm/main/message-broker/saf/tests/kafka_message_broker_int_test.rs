@@ -35,7 +35,7 @@ fn test_kafka_message_broker_factory_rejects_blank_group_id() {
 #[cfg(feature = "kafka")]
 #[tokio::test]
 async fn test_kafka_message_broker_health_check_fails_for_unreachable_broker() {
-    use message_broker_pattern::{BrokerError, HealthCheckRequest, MessageBroker as _};
+    use message_broker_pattern::{BrokerError, HealthCheckRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker =
@@ -53,7 +53,7 @@ async fn test_kafka_message_broker_health_check_fails_for_unreachable_broker() {
 async fn test_kafka_message_broker_publish_fails_for_unreachable_broker() {
     use std::sync::Arc;
 
-    use message_broker_pattern::{BrokerError, Message, MessageBroker as _, PublishRequest};
+    use message_broker_pattern::{BrokerError, Message, PublishRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker =
@@ -98,7 +98,7 @@ async fn test_publish_subscribe_roundtrip_with_live_broker() {
     use std::sync::Arc;
 
     use futures::StreamExt as _;
-    use message_broker_pattern::{Message, MessageBroker as _, PublishRequest, SubscribeRequest};
+    use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let brokers = require_kafka_brokers();
@@ -150,7 +150,7 @@ async fn test_publish_subscribe_headers_survive_roundtrip_with_live_broker() {
     use std::sync::Arc;
 
     use futures::StreamExt as _;
-    use message_broker_pattern::{Message, MessageBroker as _, PublishRequest, SubscribeRequest};
+    use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let brokers = require_kafka_brokers();
@@ -198,7 +198,7 @@ async fn test_publish_subscribe_headers_survive_roundtrip_with_live_broker() {
 #[cfg(feature = "kafka")]
 #[tokio::test]
 async fn test_subscribe_returns_stream_without_panicking() {
-    use message_broker_pattern::{MessageBroker as _, SubscribeRequest};
+    use message_broker_pattern::SubscribeRequest;
     use message_broker_svc_saf::MessageBrokerFactory;
 
     let broker = MessageBrokerFactory::kafka("127.0.0.1:9999", "test-group-cap")

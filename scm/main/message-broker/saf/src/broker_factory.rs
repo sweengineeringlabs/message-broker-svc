@@ -16,10 +16,7 @@ use message_broker_svc_nats_spi::NatsMessageBroker;
 #[cfg(feature = "postgres")]
 use message_broker_svc_postgres_spi::PostgresMessageBroker;
 
-use configbuilder::ConfigBuilder;
-use message_broker_pattern::{
-    BrokerError, MessageBroker, ValidationError, ValidationRequest, Validator,
-};
+use message_broker_pattern::{BrokerError, MessageBroker};
 
 use crate::noop_message_broker::NoopMessageBroker;
 
@@ -27,13 +24,6 @@ use crate::noop_message_broker::NoopMessageBroker;
 pub struct MessageBrokerFactory;
 
 impl MessageBrokerFactory {
-    /// Return a [`ConfigBuilderImpl`](configbuilder::ConfigBuilderImpl) pre-seeded with this crate's package name and version.
-    pub fn create_config_builder() -> configbuilder::ConfigBuilderImpl {
-        configbuilder::ConfigLoaderFactory::create_config_builder()
-            .with_name(env!("CARGO_PKG_NAME"))
-            .with_version(env!("CARGO_PKG_VERSION"))
-    }
-
     /// Construct the no-op reference broker.
     ///
     /// Publishing discards the message and subscribing yields an empty stream.
@@ -42,11 +32,6 @@ impl MessageBrokerFactory {
     /// [`MessageBrokerFactory::postgres`] instead.
     pub fn noop() -> Box<dyn MessageBroker> {
         Box::new(NoopMessageBroker)
-    }
-
-    /// Validate a value that implements [`Validator`].
-    pub fn validate<V: Validator>(v: &V) -> Result<(), ValidationError> {
-        v.validate(ValidationRequest)
     }
 
     /// Connect to a Kafka cluster and return a broker handle.

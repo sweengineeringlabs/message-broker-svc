@@ -30,7 +30,6 @@ message-broker-svc-core          = { path = "../core", version = "0.1.0" }
 message-broker-svc-nats-spi      = { path = "../spi/nats-spi", version = "0.1.0", optional = true }
 message-broker-svc-kafka-spi     = { path = "../spi/kafka-spi", version = "0.1.0", optional = true }
 message-broker-svc-postgres-spi  = { path = "../spi/postgres-spi", version = "0.1.0", optional = true }
-configbuilder = "0.8"
 futures       = "0.3"
 
 [dev-dependencies]
