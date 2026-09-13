@@ -5,18 +5,20 @@
 ```
 message-broker-svc/
 ├── README.md
-├── scm/
-│   ├── Cargo.toml          # workspace: [main/message-broker/spi/*, main/message-broker/saf]
-│   ├── docs/
-│   │   ├── 3-design/architecture.md
-│   │   ├── 3-design/adr/ADR-001-extract-from-edge-runtime-pilot.md
-│   │   └── 4-development/developer_guide.md     # this file
-│   └── main/message-broker/
-│       ├── spi/
-│       │   ├── nats-spi/        # message-broker-svc-nats-spi
-│       │   ├── kafka-spi/       # message-broker-svc-kafka-spi
-│       │   └── postgres-spi/    # message-broker-svc-postgres-spi
-│       └── saf/              # message-broker-svc-saf -- MessageBrokerFactory
+├── docs/
+│   ├── README.md                                 # docs section index
+│   ├── 0-ideation/papers/README.md
+│   ├── 3-design/README.md, architecture.md
+│   ├── 3-design/adr/ADR-001-extract-from-edge-runtime-pilot.md
+│   └── 4-development/README.md, developer_guide.md   # this file
+└── scm/
+    ├── Cargo.toml          # workspace: [main/message-broker/spi/*, main/message-broker/saf]
+    └── main/message-broker/
+        ├── spi/
+        │   ├── nats-spi/        # message-broker-svc-nats-spi
+        │   ├── kafka-spi/       # message-broker-svc-kafka-spi
+        │   └── postgres-spi/    # message-broker-svc-postgres-spi
+        └── saf/              # message-broker-svc-saf -- MessageBrokerFactory
 ```
 
 ## Branching and Releases
