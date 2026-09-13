@@ -13,10 +13,13 @@ mirroring this org's `<name>-pattern`/`<name>-svc` split (see
 
 ## Quick Start
 
+Requires the `inmemory` feature (`cargo add message-broker-svc-saf --features inmemory`):
+
 ```rust
 use message_broker_svc_saf::MessageBrokerFactory;
 
-let broker = MessageBrokerFactory::nats("nats://localhost:4222").await?;
+// No external service required -- real in-process pub/sub, not a stub.
+let broker = MessageBrokerFactory::in_memory();
 ```
 
 ## Crates
@@ -35,18 +38,16 @@ and `MessageBrokerFactory` exposes five independent, directly-typed constructors
 (`noop`/`in_memory`/`nats`/`kafka`/`postgres`), not a runtime-selectable registry. See
 [Architecture](docs/3-design/architecture.md) for why.
 
-**Scope note:** this repo covers only `message-broker-pattern`'s `MessageBroker` trait.
-`edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
+**Scope note:** this repo covers only `message-broker-pattern`'s `MessageBroker` trait —
+four real backend implementations (in-memory, NATS, Kafka, Postgres) plus a no-op
+reference. `edge-runtime`'s own pilot also implemented a richer `TaskQueue` contract
 (`runtime-message-broker-contract`, a superset) and an `ApplicationConfig`/`BrokerProvider`
-composition layer (including the `BackendKind`-driven `from_config` dispatch mechanism
-itself) — neither was ported here; they remain `edge-runtime`-specific concerns until a
-similar extraction is scoped for them separately. The real,
-`tokio::sync::broadcast`-backed in-memory backend *is* part of this repo, as
-`message-broker-svc-inmemory-spi` — initially left out alongside the above on a mistaken
-belief that nothing depended on it, restored once checking `edge-runtime`'s actual source
-showed it does (see [Architecture](docs/3-design/architecture.md)).
-`MessageBrokerFactory::noop()` remains this repo's own no-op reference implementation,
-distinct from the real in-memory backend.
+composition layer (including a `BackendKind`-driven `from_config` dispatch mechanism) —
+neither is part of this repo; they remain `edge-runtime`-specific concerns until a
+similar extraction is scoped for them separately. See
+[Architecture](docs/3-design/architecture.md) for the full reasoning, including why the
+in-memory backend is real (not `noop`'s stand-in) and why backend selection is five
+independent constructors rather than a config-driven dispatch.
 
 ## Documentation
 
