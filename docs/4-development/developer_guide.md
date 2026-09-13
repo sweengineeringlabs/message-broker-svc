@@ -33,10 +33,12 @@ message-broker-svc/
   [`-nats-spi`](https://crates.io/crates/message-broker-svc-nats-spi),
   [`-kafka-spi`](https://crates.io/crates/message-broker-svc-kafka-spi),
   [`-postgres-spi`](https://crates.io/crates/message-broker-svc-postgres-spi),
-  [`-saf`](https://crates.io/crates/message-broker-svc-saf), each v0.1.0. Depends on
+  [`-saf`](https://crates.io/crates/message-broker-svc-saf), each v0.1.0, each tagged in
+  this repo's own git history as `core/v0.1.0`/`inmemory-spi/v0.1.0`/`nats-spi/v0.1.0`/
+  `kafka-spi/v0.1.0`/`postgres-spi/v0.1.0`/`saf/v0.1.0` (matching `wasm-capability-pattern`'s
+  own per-crate tag convention). Depends on
   [`message-broker-pattern`](https://crates.io/crates/message-broker-pattern) `"0.1.0"` by
-  version, not `git`. Not yet tagged in this repo's own git history — a `v0.1.0` tag
-  should follow.
+  version, not `git`.
 
 ## Working on Any Crate
 
