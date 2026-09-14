@@ -1,8 +1,11 @@
 # 3-design
 
+**Audience**: Architects, technical leads, contributors.
+
 | Document | Description |
 |----------|--------------|
-| [architecture.md](architecture.md) | Component diagram, dispatch table, scope boundary (what was and wasn't extracted) |
-| [adr/ADR-001-extract-from-edge-runtime-pilot.md](adr/ADR-001-extract-from-edge-runtime-pilot.md) | Full design record: why extract from `edge-runtime`'s pilot rather than rebuild, what was deliberately not ported |
+| [architecture.md](architecture.md) | Component diagram, dispatch tables for both factories, scope boundary (what was and wasn't extracted) |
+| [compliance/compliance_checklist.md](compliance/compliance_checklist.md) | Architecture compliance checklist derived from architecture.md |
+| [adr/README.md](adr/README.md) | ADR index |
 
 [← Docs index](../README.md)

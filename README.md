@@ -1,7 +1,7 @@
 # message-broker-svc
 
-> **TLDR:** Concrete in-memory/NATS/Kafka/Postgres `MessageBroker` implementations on
-> top of
+> **TLDR:** Concrete in-memory/NATS/Kafka/Postgres `MessageBroker` implementations, plus
+> in-memory/NATS/Kafka `TaskQueue` implementations, on top of
 > [`message-broker-pattern`](https://github.com/sweengineeringlabs/message-broker-pattern)'s
 > contract. See [Architecture](docs/3-design/architecture.md) for the full design.
 
@@ -30,13 +30,14 @@ let broker = MessageBrokerFactory::in_memory();
 | [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | `NatsMessageBroker` + `NatsTaskQueue` — `async-nats`-backed |
 | [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | `KafkaMessageBroker` + `KafkaTaskQueue` — `rdkafka`-backed |
 | [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | `PostgresMessageBroker` — `pgmq`-backed; no `TaskQueue` (`edge-runtime`'s original pilot never had one for Postgres) |
-| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — the construction/dispatch facade consumers depend on. No `TaskQueueFactory` yet — tracked separately |
+| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` + `TaskQueueFactory` — the construction facades consumers depend on |
 
 No `BackendKind` enum, no shared config struct, no `from_config` dispatch — each `spi`
 crate owns its own config type (`InMemoryConfig`/`NatsConfig`/`KafkaConfig`/`PostgresConfig`),
-and `MessageBrokerFactory` exposes five independent, directly-typed constructors
-(`noop`/`in_memory`/`nats`/`kafka`/`postgres`), not a runtime-selectable registry. See
-[Architecture](docs/3-design/architecture.md) for why.
+`MessageBrokerFactory` exposes five independent, directly-typed constructors
+(`noop`/`in_memory`/`nats`/`kafka`/`postgres`), and `TaskQueueFactory` mirrors it with
+three more (`in_memory`/`nats`/`kafka`, no `postgres`, no no-op) — none of it a
+runtime-selectable registry. See [Architecture](docs/3-design/architecture.md) for why.
 
 **Scope note:** this repo covers `message-broker-pattern`'s `MessageBroker` *and*
 `TaskQueue` traits — both now live in that one pattern crate. `TaskQueue` was initially

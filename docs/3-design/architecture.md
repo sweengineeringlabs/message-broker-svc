@@ -1,5 +1,7 @@
 # message-broker-svc Architecture
 
+**Audience**: Architects, technical leads, contributors.
+
 ## Overview
 
 Six crates — one shared `core`, four `spi` providers, and one `saf` facade:
