@@ -17,7 +17,9 @@ use message_broker_svc_nats_spi::NatsTaskQueue;
 
 #[cfg(any(feature = "kafka", feature = "nats"))]
 use message_broker_pattern::QueueError;
-use message_broker_pattern::{TaskQueue, TaskQueueFactoryContract};
+#[cfg(any(feature = "inmemory", feature = "kafka", feature = "nats"))]
+use message_broker_pattern::TaskQueue;
+use message_broker_pattern::TaskQueueFactoryContract;
 
 /// Zero-size factory type for constructing task queue instances.
 pub struct TaskQueueFactory;
