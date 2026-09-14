@@ -10,7 +10,7 @@
 //! shape this factory offers -- see `runtime-svc-registry` for that.
 
 #[cfg(feature = "inmemory")]
-use message_broker_svc_inmemory_spi::InMemoryMessageBroker;
+use message_broker_svc_core::InMemoryMessageBroker;
 #[cfg(feature = "kafka")]
 use message_broker_svc_kafka_spi::KafkaMessageBroker;
 #[cfg(feature = "nats")]

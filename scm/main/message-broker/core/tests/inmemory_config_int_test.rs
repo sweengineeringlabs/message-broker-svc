@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use configbuilder::{ConfigError, ConfigLoaderFactory, FeatureStateOps, OptionalSection};
-use message_broker_svc_inmemory_spi::InMemoryConfig;
+use message_broker_svc_core::InMemoryConfig;
 use tempfile::TempDir;
 
 /// Write `content` to `application.toml` in a fresh temp dir and return a loader

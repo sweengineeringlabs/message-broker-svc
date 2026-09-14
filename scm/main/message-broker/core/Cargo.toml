@@ -1,13 +1,13 @@
 [package]
 name         = "message-broker-svc-core"
-version      = "0.1.0"
+version      = "0.2.0"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
 repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
 rust-version = "1.98"
-description  = "message-broker-svc core: generic implementation code shared by every *-spi backend, exploiting message-broker-pattern's own trait bounds directly. Mirrors ledger's own adapter/replication crate (generic over LedgerPayload, never inside ledger-base-port)."
-keywords     = ["message-broker", "core", "swe"]
+description  = "message-broker-svc core: the technology-free reference implementation of message-broker-pattern's MessageBroker/TaskQueue traits (InMemoryMessageBroker/InMemoryTaskQueue), backed only by tokio::sync::broadcast/mpsc. No external technology dependency -- see spi/* for those."
+keywords     = ["message-broker", "core", "in-memory", "swe"]
 categories   = ["network-programming", "asynchronous"]
 
 [package.metadata.arch]
@@ -19,7 +19,17 @@ name = "message_broker_svc_core"
 path = "src/lib.rs"
 
 [dependencies]
-message-broker-pattern = "0.1.0"
+message-broker-pattern       = "0.1.1"
+message-broker-svc-spi-shared = { path = "../spi/shared", version = "0.1.0" }
+configbuilder = "0.8"
+serde         = { version = "1.0", features = ["derive"] }
+futures       = "0.3"
+tokio         = { version = "1.52", features = ["sync"] }
+
+[dev-dependencies]
+tokio    = { version = "1.52", features = ["rt-multi-thread", "macros", "time"] }
+futures  = "0.3"
+tempfile = "3.27"
 
 [lints.rust]
 unsafe_code  = "deny"

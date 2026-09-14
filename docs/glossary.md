@@ -4,7 +4,7 @@ Alphabetized list of terms used in `message-broker-svc`.
 
 ---
 
-**InMemoryConfig** - `message-broker-svc-inmemory-spi`'s config type. No fields — this backend takes no runtime parameters.
+**InMemoryConfig** - `message-broker-svc-core`'s config type. No fields — this backend takes no runtime parameters.
 
 **InMemoryMessageBroker** - In-process `MessageBroker` backed by `tokio::sync::broadcast`. Real, full-fanout pub/sub, distinct from `NoopMessageBroker`.
 
@@ -32,8 +32,10 @@ Alphabetized list of terms used in `message-broker-svc`.
 
 **TaskQueueFactory** - Construction facade in `message-broker-svc-saf`, mirroring `MessageBrokerFactory`: `in_memory`/`nats`/`kafka`, all returning `Box<dyn TaskQueue>`. No `postgres` constructor and no no-op reference — neither exists for `TaskQueue` in this domain.
 
-**validate_config** - `message-broker-svc-core`'s one generic function: validates any `C: Validator` before a backend attempts I/O. Every `spi` crate's config type calls this once in its own constructor instead of hand-rolling its own check.
+**validate_config** - `ValidatorExt`'s default method: validates any `Self: Validator` before a backend attempts I/O. Every backend's config type calls `self.validate_config()` once in its own constructor instead of hand-rolling its own check.
 
-**validator_response** - `message-broker-svc-core`'s second generic function: wraps a `Validator`-implementing config in the `ValidatorResponse` every `MessageBroker::validator()` implementation returns, byte-for-byte identical across all four backends before this function existed.
+**ValidatorExt** - `message-broker-svc-spi-shared`'s extension trait over `Validator`, giving every implementor `validate_config`/`validator_response` for free (blanket-implemented for every `T: Validator`) rather than exposing free functions or a separate helper struct.
+
+**validator_response** - `ValidatorExt`'s second default method: wraps a `Validator`-implementing config in the `ValidatorResponse` every `MessageBroker::validator()` implementation returns, byte-for-byte identical across all four backends before this method existed.
 
 [← Docs index](README.md)

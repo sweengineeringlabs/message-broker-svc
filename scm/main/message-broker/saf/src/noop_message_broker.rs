@@ -13,13 +13,15 @@ use message_broker_pattern::{
     BrokerError, BrokerFuture, HealthCheckRequest, MessageBroker, MessageStream, PublishRequest,
     SubscribeRequest, SubscribeResponse, ValidatorRequest, ValidatorResponse,
 };
+use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::noop_validator::NoopValidator;
 
 /// Freshly constructed each call: [`NoopMessageBroker`] is a zero-sized unit
 /// struct with no config field to hold and clone, unlike the real backends
-/// (`Arc<their-own-Config>`) — see `message-broker-svc-core`'s
-/// `validator_response`, the same shared helper every backend uses.
+/// (`Arc<their-own-Config>`) — see `message-broker-svc-spi-shared`'s
+/// [`ValidatorExt::validator_response`], the same shared extension trait
+/// every backend uses.
 fn noop_validator_handle() -> Arc<NoopValidator> {
     Arc::new(NoopValidator)
 }
@@ -54,8 +56,6 @@ impl MessageBroker for NoopMessageBroker {
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
-        Ok(message_broker_svc_core::validator_response(
-            &noop_validator_handle(),
-        ))
+        Ok(noop_validator_handle().validator_response())
     }
 }

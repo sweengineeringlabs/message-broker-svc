@@ -19,8 +19,8 @@ async fn test_kafka_message_broker_factory_constructs_without_network() {
 }
 
 /// @covers: MessageBrokerFactory::kafka — rejects a blank `group_id` via
-/// `KafkaConfig`'s own `Validator` impl (through `message-broker-svc-core`'s
-/// `validate_config`), before ever building an rdkafka client.
+/// `KafkaConfig`'s own `Validator` impl (through `message-broker-svc-spi-shared`'s
+/// `ValidatorExt::validate_config`), before ever building an rdkafka client.
 #[cfg(feature = "kafka")]
 #[test]
 fn test_kafka_message_broker_factory_rejects_blank_group_id() {

@@ -24,6 +24,7 @@ use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
+use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::KafkaConfig;
 
@@ -117,7 +118,7 @@ impl KafkaMessageBroker {
             url: brokers.to_owned(),
             group_id: group_id.to_owned(),
         };
-        message_broker_svc_core::validate_config(&config)?;
+        config.validate_config()?;
 
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", brokers)
@@ -276,7 +277,7 @@ impl MessageBroker for KafkaMessageBroker {
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
-        Ok(message_broker_svc_core::validator_response(&self.config))
+        Ok(self.config.validator_response())
     }
 }
 

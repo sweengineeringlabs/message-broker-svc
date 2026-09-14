@@ -1,9 +1,9 @@
-//! Integration tests for [`message_broker_svc_core::validator_response`].
+//! Integration tests for [`message_broker_svc_spi_shared::ValidatorExt`].
 
 use std::sync::Arc;
 
-use message_broker_pattern::{ValidationError, ValidationRequest, Validator};
-use message_broker_svc_core::validator_response;
+use message_broker_pattern::{BrokerError, ValidationError, ValidationRequest, Validator};
+use message_broker_svc_spi_shared::ValidatorExt;
 
 struct AlwaysValid;
 
@@ -23,11 +23,30 @@ impl Validator for AlwaysInvalid {
     }
 }
 
+/// @covers: validate_config — a valid config passes through untouched.
+#[test]
+fn test_validate_config_ok_for_valid_config_happy() {
+    assert!(matches!(AlwaysValid.validate_config(), Ok(())));
+}
+
+/// @covers: validate_config — an invalid config's violation text surfaces in
+/// the returned error, not silently dropped.
+#[test]
+fn test_validate_config_err_for_invalid_config_error() {
+    let result = AlwaysInvalid.validate_config();
+    match result {
+        Err(BrokerError::Connection(reason)) => {
+            assert!(reason.contains("always invalid"), "reason was: {reason}");
+        }
+        other => panic!("expected BrokerError::Connection, got {other:?}"),
+    }
+}
+
 /// @covers: validator_response — the returned handle actually delegates to
 /// the wrapped config's own `validate`, not a stub that always says ok.
 #[test]
 fn test_validator_response_delegates_validate_to_wrapped_config_happy() {
-    let response = validator_response(&Arc::new(AlwaysValid));
+    let response = Arc::new(AlwaysValid).validator_response();
     assert!(matches!(
         response.validator.validate(ValidationRequest),
         Ok(())
@@ -38,7 +57,7 @@ fn test_validator_response_delegates_validate_to_wrapped_config_happy() {
 /// still surface through the type-erased handle.
 #[test]
 fn test_validator_response_delegates_validate_to_wrapped_config_error() {
-    let response = validator_response(&Arc::new(AlwaysInvalid));
+    let response = Arc::new(AlwaysInvalid).validator_response();
     let result = response.validator.validate(ValidationRequest);
     match result {
         Err(ValidationError { violations }) => {

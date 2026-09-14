@@ -9,7 +9,7 @@
 //! pilot never had one either.
 
 #[cfg(feature = "inmemory")]
-use message_broker_svc_inmemory_spi::InMemoryTaskQueue;
+use message_broker_svc_core::InMemoryTaskQueue;
 #[cfg(feature = "kafka")]
 use message_broker_svc_kafka_spi::KafkaTaskQueue;
 #[cfg(feature = "nats")]

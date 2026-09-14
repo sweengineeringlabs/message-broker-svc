@@ -16,6 +16,7 @@ use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
+use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::NatsConfig;
 
@@ -68,14 +69,14 @@ impl NatsMessageBroker {
     /// Establish a NATS connection and return a broker handle.
     ///
     /// Rejects an empty/whitespace-only `url` immediately, via
-    /// [`message_broker_svc_core::validate_config`]: `async_nats::connect`
+    /// [`ValidatorExt::validate_config`]: `async_nats::connect`
     /// treats an empty address as a slow DNS-resolution failure rather than a
     /// fast parse error, which would otherwise hang this call for the OS
     /// resolver's full timeout instead of returning quickly.
     pub async fn connect(url: impl Into<String>) -> Result<Self, BrokerError> {
         let url = url.into();
         let config = NatsConfig { url: url.clone() };
-        message_broker_svc_core::validate_config(&config)?;
+        config.validate_config()?;
 
         let client = async_nats::connect(url)
             .await
@@ -152,7 +153,7 @@ impl MessageBroker for NatsMessageBroker {
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
-        Ok(message_broker_svc_core::validator_response(&self.config))
+        Ok(self.config.validator_response())
     }
 }
 

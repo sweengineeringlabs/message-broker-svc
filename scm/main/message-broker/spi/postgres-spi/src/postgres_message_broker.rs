@@ -21,6 +21,7 @@ use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
+use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::PostgresConfig;
 
@@ -63,7 +64,7 @@ impl PostgresMessageBroker {
             url: dsn.to_owned(),
             queue_name: queue_name.to_owned(),
         };
-        message_broker_svc_core::validate_config(&config)?;
+        config.validate_config()?;
 
         let pool = PgPool::connect(dsn)
             .await
@@ -256,7 +257,7 @@ impl MessageBroker for PostgresMessageBroker {
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
-        Ok(message_broker_svc_core::validator_response(&self.config))
+        Ok(self.config.validator_response())
     }
 }
 

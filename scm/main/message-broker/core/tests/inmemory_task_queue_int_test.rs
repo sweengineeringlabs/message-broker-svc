@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use message_broker_pattern::{Task, TaskQueue};
-use message_broker_svc_inmemory_spi::InMemoryTaskQueue;
+use message_broker_svc_core::InMemoryTaskQueue;
 
 #[tokio::test]
 async fn test_enqueue_and_dequeue_delivers_task() {

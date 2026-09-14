@@ -42,7 +42,8 @@ mod postgres_feature {
 
     /// @covers: MessageBrokerFactory::postgres — rejects a blank `queue_name`
     /// via `PostgresConfig`'s own `Validator` impl (through
-    /// `message-broker-svc-core`'s `validate_config`), before ever opening a pool.
+    /// `message-broker-svc-spi-shared`'s `ValidatorExt::validate_config`), before
+    /// ever opening a pool.
     #[test]
     fn test_postgres_connect_rejects_blank_queue_name() {
         let rt = tokio::runtime::Builder::new_current_thread()
