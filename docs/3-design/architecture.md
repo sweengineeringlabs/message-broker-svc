@@ -267,4 +267,14 @@ implemented here too: `message-broker-svc-inmemory-spi::InMemoryTaskQueue`,
 (`message-broker-svc-postgres-spi` has none — Postgres/`pgmq` never had a `TaskQueue`
 backend in `edge-runtime`'s original pilot either).
 
+**Verified 1:1 with the pilot, not assumed**: every ported `*TaskQueue` (and its
+crate-local `constants.rs`/`LoggingConsumerContext`) was diffed line-for-line against
+`edge-runtime`'s own pre-deletion source. Every diff is an import-path rename
+(`runtime_message_broker_pattern::` → `message_broker_pattern::`) or a doc-comment
+correction (a stale `async-nats 0.48` reference updated to the `0.49` actually
+pinned) — zero behavioral changes. The one real addition, `NatsTaskQueue::connect`,
+is the blank-URL-check-then-connect logic that used to live inline in
+`edge-runtime`'s `TaskQueueFactory::nats`, relocated here so `saf` no longer needs
+`async-nats` as a direct dependency for it — same logic, moved, not altered.
+
 [← Docs index](../README.md)
