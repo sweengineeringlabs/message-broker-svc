@@ -11,17 +11,16 @@ use std::sync::Arc;
 
 use message_broker_pattern::{
     BrokerError, BrokerFuture, HealthCheckRequest, MessageBroker, MessageStream, PublishRequest,
-    SubscribeRequest, SubscribeResponse, ValidatorRequest, ValidatorResponse,
+    SubscribeRequest, SubscribeResponse, Validator, ValidatorRequest, ValidatorResponse,
 };
-use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::noop_validator::NoopValidator;
 
 /// Freshly constructed each call: [`NoopMessageBroker`] is a zero-sized unit
 /// struct with no config field to hold and clone, unlike the real backends
-/// (`Arc<their-own-Config>`) — see `message-broker-svc-spi-shared`'s
-/// [`ValidatorExt::validator_response`], the same shared extension trait
-/// every backend uses.
+/// (`Arc<their-own-Config>`) — see `message-broker-pattern`'s
+/// [`Validator::validator_response`], the same default trait method every
+/// backend uses.
 fn noop_validator_handle() -> Arc<NoopValidator> {
     Arc::new(NoopValidator)
 }

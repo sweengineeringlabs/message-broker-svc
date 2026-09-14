@@ -13,8 +13,8 @@ async fn test_nats_message_broker_connect_fails_for_unreachable_host() {
 }
 
 /// @covers: MessageBrokerFactory::nats — rejects a blank `url` via
-/// `NatsConfig`'s own `Validator` impl (through `message-broker-svc-spi-shared`'s
-/// `ValidatorExt::validate_config`), before ever attempting a network connection.
+/// `NatsConfig`'s own `Validator` impl (through `message-broker-pattern`'s
+/// `Validator::validate_config`), before ever attempting a network connection.
 #[cfg(feature = "nats")]
 #[tokio::test]
 async fn test_nats_message_broker_connect_fails_fast_for_blank_url() {

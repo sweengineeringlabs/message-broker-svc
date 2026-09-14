@@ -27,7 +27,6 @@ let broker = MessageBrokerFactory::in_memory();
 | Crate | What it is |
 |-------|------------|
 | [`message-broker-svc-core`](scm/main/message-broker/core) | The technology-free reference implementation: in-memory `MessageBroker` + `TaskQueue` (no external dependency, so not an "spi") |
-| [`message-broker-svc-spi-shared`](scm/main/message-broker/spi/shared) | Implementation code shared by more than one `*-spi` backend (`ValidatorExt`) |
 | [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | NATS `MessageBroker` + `TaskQueue` |
 | [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | Kafka `MessageBroker` + `TaskQueue` |
 | [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | Postgres `MessageBroker` (no `TaskQueue`) |

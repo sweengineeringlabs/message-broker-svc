@@ -16,15 +16,15 @@ re-run the listed command after any change and expect the stated result.
 
 | # | Rule | Verify |
 |---|------|--------|
-| 3 | `message-broker-svc-core` names no backend technology and has no external-technology dependency | `grep -nE "^\s*(pub )?(struct\|enum\|fn) \w*(Kafka\|Nats\|Postgres\|Redis)" main/message-broker/core/src/*.rs` returns nothing; `main/message-broker/core/Cargo.toml`'s `[dependencies]` lists only `message-broker-pattern`, `message-broker-svc-spi-shared`, `configbuilder`, `serde`, `futures`, `tokio` (no `rdkafka`/`async-nats`/`sqlx`) |
-| 4 | No crate under `spi/` is named for a backend that wraps nothing external (there is no "in-memory spi") | `ls main/message-broker/spi/` lists only `shared`, `nats-spi`, `kafka-spi`, `postgres-spi` — no `inmemory-spi` |
+| 3 | `message-broker-svc-core` names no backend technology and has no external-technology dependency | `grep -nE "^\s*(pub )?(struct\|enum\|fn) \w*(Kafka\|Nats\|Postgres\|Redis)" main/message-broker/core/src/*.rs` returns nothing; `main/message-broker/core/Cargo.toml`'s `[dependencies]` lists only `message-broker-pattern`, `configbuilder`, `serde`, `futures`, `tokio` (no `rdkafka`/`async-nats`/`sqlx`) |
+| 4 | No crate under `spi/` is named for a backend that wraps nothing external (there is no "in-memory spi") | `ls main/message-broker/spi/` lists only `nats-spi`, `kafka-spi`, `postgres-spi` — no `inmemory-spi`, no `shared` |
 
-## 3. `spi/shared` holds only genuinely shared, generic logic
+## 3. No hand-rolled validate_config/validator_response — they live on Validator itself
 
 | # | Rule | Verify |
 |---|------|--------|
-| 5 | `message-broker-svc-spi-shared` exposes `ValidatorExt` (`validate_config`/`validator_response` as default trait methods) — no backend-specific logic, and not a free-standing helper struct | `grep -n "^pub trait\|^pub fn\|^pub struct" main/message-broker/spi/shared/src/*.rs` shows exactly `pub trait ValidatorExt` |
-| 6 | No `spi`/`core` crate hand-rolls its own version of `validate_config`/`validator_response` | `grep -rln "fn validate_config\|fn validator_response" main/message-broker/spi/nats-spi/src/*.rs main/message-broker/spi/kafka-spi/src/*.rs main/message-broker/spi/postgres-spi/src/*.rs main/message-broker/core/src/*.rs` returns nothing (all call `ValidatorExt`'s methods instead) |
+| 5 | No `spi`/`core`/`saf` crate hand-rolls, re-declares, or wraps its own version of `validate_config`/`validator_response` | `grep -rln "fn validate_config\|fn validator_response" main/message-broker/spi/nats-spi/src/*.rs main/message-broker/spi/kafka-spi/src/*.rs main/message-broker/spi/postgres-spi/src/*.rs main/message-broker/core/src/*.rs main/message-broker/saf/src/*.rs` returns nothing (every backend calls `message-broker-pattern`'s `Validator::validate_config`/`validator_response` default methods directly) |
+| 6 | There is no `spi/shared` crate — it was deleted, not deprecated, once its content moved to `message-broker-pattern` | `ls main/message-broker/spi/` returns no `shared` entry; `grep -rln "spi-shared\|spi_shared" --include="*.toml" --include="*.rs" main/message-broker/` returns nothing |
 
 ## 4. Uniform constructor return types
 

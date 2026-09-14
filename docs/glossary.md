@@ -32,10 +32,8 @@ Alphabetized list of terms used in `message-broker-svc`.
 
 **TaskQueueFactory** - Construction facade in `message-broker-svc-saf`, mirroring `MessageBrokerFactory`: `in_memory`/`nats`/`kafka`, all returning `Box<dyn TaskQueue>`. No `postgres` constructor and no no-op reference — neither exists for `TaskQueue` in this domain.
 
-**validate_config** - `ValidatorExt`'s default method: validates any `Self: Validator` before a backend attempts I/O. Every backend's config type calls `self.validate_config()` once in its own constructor instead of hand-rolling its own check.
+**validate_config** - A default method on `message-broker-pattern`'s own `Validator` trait: validates any `Self: Validator` before a backend attempts I/O. Every backend's config type calls `self.validate_config()` once in its own constructor instead of hand-rolling its own check. Previously lived here as `message-broker-svc-spi-shared`'s `ValidatorExt`, folded directly into `Validator` itself — see `message-broker-pattern`'s own glossary/architecture doc.
 
-**ValidatorExt** - `message-broker-svc-spi-shared`'s extension trait over `Validator`, giving every implementor `validate_config`/`validator_response` for free (blanket-implemented for every `T: Validator`) rather than exposing free functions or a separate helper struct.
-
-**validator_response** - `ValidatorExt`'s second default method: wraps a `Validator`-implementing config in the `ValidatorResponse` every `MessageBroker::validator()` implementation returns, byte-for-byte identical across all four backends before this method existed.
+**validator_response** - `Validator`'s second default method: wraps a `Validator`-implementing config in the `ValidatorResponse` every `MessageBroker::validator()` implementation returns, byte-for-byte identical across all four backends before this method existed.
 
 [← Docs index](README.md)

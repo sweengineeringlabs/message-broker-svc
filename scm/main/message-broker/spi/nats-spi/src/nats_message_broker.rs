@@ -14,9 +14,9 @@ use message_broker_pattern::MessageStream;
 use message_broker_pattern::PublishRequest;
 use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
+use message_broker_pattern::Validator;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
-use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::NatsConfig;
 
@@ -69,7 +69,7 @@ impl NatsMessageBroker {
     /// Establish a NATS connection and return a broker handle.
     ///
     /// Rejects an empty/whitespace-only `url` immediately, via
-    /// [`ValidatorExt::validate_config`]: `async_nats::connect`
+    /// [`Validator::validate_config`]: `async_nats::connect`
     /// treats an empty address as a slow DNS-resolution failure rather than a
     /// fast parse error, which would otherwise hang this call for the OS
     /// resolver's full timeout instead of returning quickly.

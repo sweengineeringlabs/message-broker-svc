@@ -4,8 +4,10 @@
 
 ## Overview
 
-Six crates — one `core` reference implementation, one `spi/shared` helper crate,
-three `spi` providers, and one `saf` facade:
+Five crates — one `core` reference implementation, three `spi` providers, and one
+`saf` facade. There is no `spi/shared` crate — see "Why `validate_config`/
+`validator_response` live on `Validator` itself, not a `spi/shared` crate" below for
+why that was tried and then dissolved.
 
 - **`message-broker-svc-core`** — the technology-free reference implementation:
   `InMemoryMessageBroker` (`tokio::sync::broadcast`) + `InMemoryTaskQueue`
@@ -19,11 +21,6 @@ three `spi` providers, and one `saf` facade:
   "in-memory spi" — spi names a crate that wraps one *external* technology, and
   in-memory wraps nothing external. See "`core` is the reference implementation, not
   an spi" below.
-- **`message-broker-svc-spi-shared`** — implementation code shared by more than one
-  `*-spi` backend, extending `message-broker-pattern`'s own `Validator` trait directly
-  via the `ValidatorExt` extension trait (`validate_config`/`validator_response`) rather
-  than exposing free functions or a separate helper struct — program to the interface,
-  not to the consumer. See "Why `spi/shared` exists" below.
 - **`message-broker-svc-nats-spi`** — `NatsMessageBroker` + `NatsTaskQueue`
   (`async-nats`, `TaskQueue` via JetStream for competing-consumer semantics) +
   `NatsConfig` (this crate's own `[message_broker]` TOML config shape: `url`).
@@ -48,13 +45,14 @@ three `spi` providers, and one `saf` facade:
   `spi` crates only, never re-exported from `saf`).
 
 Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`TaskQueue`/
-`Validator` traits and value types), `message-broker-svc-spi-shared` (the one shared
-`ValidatorExt` extension trait every backend reuses), and whatever technology client it
-wraps. `message-broker-svc-core` has no `spi` dependency of its own — it wraps no
-external technology, so it has nothing to validate a network address or credential
-against, but it still depends on `spi-shared` for its own `InMemoryMessageBroker::validator()`
-impl. `message-broker-svc-saf` is the only thing that depends on `core` and all three
-real `spi` crates together.
+`Validator` traits and value types — `Validator` itself now carries
+`validate_config`/`validator_response` as default methods, so no separate shared crate
+is needed for that) and whatever technology client it wraps. `message-broker-svc-core`
+has no `spi` dependency of its own — it wraps no external technology, so it has nothing
+to validate a network address or credential against, but its `InMemoryMessageBroker::validator()`
+impl still gets `validator_response` for free from `message-broker-pattern`'s `Validator`,
+same as every other backend. `message-broker-svc-saf` is the only thing that depends on
+`core` and all three real `spi` crates together.
 
 ## Restoring the real in-memory backend
 
@@ -121,36 +119,53 @@ Both were wrong: per this org's own convention (`runtime-resource-limit-core`,
 zero-external-dependency reference implementation itself, not a home for shared helper
 functions — and "in-memory spi" is a category error, since spi means wrapping an
 external technology and in-memory wraps nothing external. Fixed by merging
-`inmemory-spi`'s content into `core` verbatim, and relocating the former `core`'s helper
-functions to `message-broker-svc-spi-shared` — see "Why `spi/shared` exists" below.
+`inmemory-spi`'s content into `core` verbatim ([message-broker-svc#2](https://github.com/sweengineeringlabs/message-broker-svc/issues/2)).
+The former `core`'s helper functions went through two more homes after that — see
+"Why `validate_config`/`validator_response` live on `Validator` itself, not a
+`spi/shared` crate" below for where they ended up and why.
 
-## Why `spi/shared` exists
+## Why `validate_config`/`validator_response` live on `Validator` itself, not a `spi/shared` crate
 
-Mirrors `ledger`'s own split: `LedgerPayload` (the trait) lives in `ledger-base-port`,
-pure port crate, zero implementation — but the *generic, reusable implementation* that
-exploits it (`RedbLogStore<P: LedgerPayload>`, `GrpcNetwork<P>`, the whole raft
-replication stack) lives in `ledger`'s own `adapter/replication` crate, never inside
-`ledger-base-port` itself. Every downstream consumer (`a2a-ledger`'s `TaskEvent`,
-`a2ac-ledger`'s own payload type) brings its own shape and gets that shared machinery
-for free.
+`message-broker-svc#2` first moved the former `core`'s two helper functions to a new
+`message-broker-svc-spi-shared` crate, reshaped as `ValidatorExt: Validator` — an
+extension trait with default-implemented `validate_config`/`validator_response`
+methods, blanket-implemented for every `T: Validator`, kept out of
+`message-broker-pattern` on the assumption that "zero implementation" ruled out
+defining any real logic there.
 
-`message-broker-pattern` is this repo's `ledger-base-port` equivalent: `Validator` (the
-trait) and nothing else — no generic function, no reusable algorithm, just the trait
-signature. `message-broker-svc-spi-shared` is this repo's `adapter/replication`
-equivalent: the one place `Validator`'s bound gets a real, generic implementation —
-not as free functions or a separate helper struct a consumer calls into, but as an
-extension trait, `ValidatorExt: Validator`, with default-implemented
-`validate_config`/`validator_response` methods, blanket-implemented for every
-`T: Validator`. Program to the interface, not to the consumer: any backend config type
-that implements `Validator` gets `config.validate_config()`/
-`config.validator_response()` for free through the interface itself, reused identically
-by `NatsConfig`/`KafkaConfig`/`PostgresConfig`/`InMemoryConfig` — each config type calls
+[message-broker-svc#3](https://github.com/sweengineeringlabs/message-broker-svc/issues/3)
+re-checked that assumption against `message-broker-pattern`'s own precedent
+(`TaskQueueFactoryContract`, and the "small structural `impl`" carve-out its
+architecture doc already documents: "zero implementation" means implementing none of
+that crate's own primary traits for a concrete type, not that a trait declared there may
+never carry a default method body) and found it didn't hold: `validate_config`/
+`validator_response` touch only `Validator::validate` (the trait's own required method)
+and `message-broker-pattern`'s own `BrokerError`/`ValidationRequest`/`ValidatorResponse`
+— identical for every implementor, zero backend-technology vocabulary, and neither
+method implements `Validator` itself for any concrete type.
+
+Folded directly onto `Validator` as default methods in `message-broker-pattern`
+(v0.1.3) — not even kept as a separate `ValidatorExt` extension trait, since none is
+needed once the methods live on the trait every implementor already depends on.
+`message-broker-svc-spi-shared` was deleted outright, not kept as a re-export (mirrors
+this repo's own precedent: `inmemory-spi` was deleted, not deprecated, when it merged
+into `core`). Every `*-spi` crate, `core`, and `saf`'s `NoopMessageBroker` now call
+`self.validate_config()`/`self.validator_response()` directly via
+`use message_broker_pattern::Validator;` — no extra import beyond the `Validator` trait
+they already needed. See `message-broker-pattern`'s own architecture doc for the
+contract-side half of this reasoning (Rust object-safety details included).
+
+Program to the interface, not to the consumer, still holds — it just turned out the
+right interface to program to was `Validator` itself, not a second trait layered on top
+of it. Any backend config type that implements `Validator` gets `validate_config()`/
+`validator_response()` for free through the interface itself, reused identically by
+`NatsConfig`/`KafkaConfig`/`PostgresConfig`/`InMemoryConfig` — each config type calls
 `self.validate_config()?` once in its own constructor and gets the same
 validate-then-map-to-`BrokerError` behavior every other backend gets, without
-duplicating it. Before this crate existed, three backends validated construction three
+duplicating it. Before this existed, three backends validated construction three
 different ways: NATS hand-rolled its own empty-`url` check, Kafka and Postgres validated
 nothing at all. Adding a fourth backend later means implementing `Validator` on its own
-config type — the extension trait methods come for free.
+config type — `validate_config`/`validator_response` come for free.
 
 A comprehensive pass over every `MessageBroker` method (checking each against "is this
 forced to be technology-specific, or is it duplicated logic that only touches
@@ -158,13 +173,12 @@ forced to be technology-specific, or is it duplicated logic that only touches
 `validator()` body — `NatsMessageBroker`, `KafkaMessageBroker`, `PostgresMessageBroker`,
 `InMemoryMessageBroker`, `NoopMessageBroker` — was the byte-for-byte identical one-liner
 `Arc::clone(&self.config) as Arc<dyn Validator>`, wrapped in `ValidatorResponse`.
-`ValidatorExt::validator_response(self: &Arc<Self>)` now provides that; every
-implementor's `validator()` is one line calling it. `publish`/`subscribe`/`health_check`
-were checked the same way and found genuinely forced to be concrete — each talks to a
-different wire protocol (`async-nats`, `rdkafka`, `sqlx`/`pgmq`, or an in-process
-channel) with no shared algorithm underneath to extract, unlike
-`validate_config`/`validator_response` which touch only `message-broker-pattern`'s own
-vocabulary.
+`Validator::validator_response(self: &Arc<Self>)` now provides that; every implementor's
+`validator()` is one line calling it. `publish`/`subscribe`/`health_check` were checked
+the same way and found genuinely forced to be concrete — each talks to a different wire
+protocol (`async-nats`, `rdkafka`, `sqlx`/`pgmq`, or an in-process channel) with no
+shared algorithm underneath to extract, unlike `validate_config`/`validator_response`
+which touch only `message-broker-pattern`'s own vocabulary.
 
 ## Config: each `spi` crate owns its own, none shared
 
@@ -176,9 +190,10 @@ config type (`NatsConfig`, `KafkaConfig`, `PostgresConfig`), independently imple
   (presence-based enabling, `deny_unknown_fields`, cross-field validation).
 - `message-broker-pattern`'s own `Validator` — the trait `MessageBroker::validator()`
   requires a return value for; each broker holds `Arc<its-own-Config>` and hands it back
-  directly. Each constructor also calls `message-broker-svc-spi-shared`'s
-  `ValidatorExt::validate_config(&self)` once, before doing any I/O — see "Why
-  `spi/shared` exists" above.
+  directly. Each constructor also calls `Validator::validate_config(&self)` once,
+  before doing any I/O — a default method on `Validator` itself, see "Why
+  `validate_config`/`validator_response` live on `Validator` itself, not a `spi/shared`
+  crate" above.
 
 This follows `edge-llm`'s own precedent (`provider/contract`'s doc comment): a contract
 type must never implement a foreign trait like `OptionalSection` itself — that would be
@@ -198,29 +213,21 @@ real dependency direction (`-saf` depends on the `spi` crates, not the reverse).
 ```mermaid
 flowchart TD
     subgraph pattern["message-broker-pattern"]
-        contract["MessageBroker, TaskQueue, Validator, Message, Task"]
+        contract["MessageBroker, TaskQueue,<br/>Validator (+ validate_config,<br/>validator_response default methods),<br/>Message, Task"]
     end
 
     subgraph svc["message-broker-svc"]
         core["message-broker-svc-core<br/>InMemoryMessageBroker + InMemoryTaskQueue + InMemoryConfig"]
-        shared["message-broker-svc-spi-shared<br/>ValidatorExt: validate_config, validator_response"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory, TaskQueueFactory,<br/>NoopMessageBroker"]
         nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsTaskQueue + NatsConfig"]
         kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaTaskQueue + KafkaConfig"]
         postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker (no TaskQueue) + PostgresConfig"]
 
-        core -->|implements MessageBroker + TaskQueue| contract
-        nats -->|implements MessageBroker + TaskQueue| contract
-        kafka -->|implements MessageBroker + TaskQueue| contract
-        postgres -->|implements MessageBroker| contract
-        saf -->|implements| contract
-        shared -->|extends| contract
-
-        core -->|calls validate_config| shared
-        nats -->|calls validate_config| shared
-        kafka -->|calls validate_config| shared
-        postgres -->|calls validate_config| shared
-        saf -->|calls validate_config, noop| shared
+        core -->|implements MessageBroker + TaskQueue,<br/>calls validate_config| contract
+        nats -->|implements MessageBroker + TaskQueue,<br/>calls validate_config| contract
+        kafka -->|implements MessageBroker + TaskQueue,<br/>calls validate_config| contract
+        postgres -->|implements MessageBroker,<br/>calls validate_config| contract
+        saf -->|implements, calls validate_config for noop| contract
 
         saf -->|wires, feature-gated| core
         saf -->|wires, feature-gated| nats

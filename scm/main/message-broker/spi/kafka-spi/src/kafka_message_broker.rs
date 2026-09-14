@@ -22,9 +22,9 @@ use message_broker_pattern::MessageStream;
 use message_broker_pattern::PublishRequest;
 use message_broker_pattern::SubscribeRequest;
 use message_broker_pattern::SubscribeResponse;
+use message_broker_pattern::Validator;
 use message_broker_pattern::ValidatorRequest;
 use message_broker_pattern::ValidatorResponse;
-use message_broker_svc_spi_shared::ValidatorExt;
 
 use crate::KafkaConfig;
 

@@ -20,40 +20,42 @@ message-broker-svc/
     └── main/message-broker/
         ├── core/              # message-broker-svc-core -- InMemoryMessageBroker + InMemoryTaskQueue (technology-free, not an spi)
         ├── spi/
-        │   ├── shared/          # message-broker-svc-spi-shared -- ValidatorExt (validate_config, validator_response)
         │   ├── nats-spi/        # message-broker-svc-nats-spi -- *MessageBroker + *TaskQueue
         │   ├── kafka-spi/       # message-broker-svc-kafka-spi -- *MessageBroker + *TaskQueue
         │   └── postgres-spi/    # message-broker-svc-postgres-spi -- *MessageBroker only
         └── saf/              # message-broker-svc-saf -- MessageBrokerFactory, TaskQueueFactory
 ```
 
+No `spi/shared` crate — `Validator::validate_config`/`validator_response` live directly
+on `message-broker-pattern`'s own `Validator` trait as default methods; see
+architecture.md's "Why `validate_config`/`validator_response` live on `Validator`
+itself, not a `spi/shared` crate".
+
 ## Branching and Releases
 
 - `dev` is the default branch; all work lands there first.
 - `main` gets fast-forwarded to `dev` after a shipped change, not on every commit.
 - Pre-1.0 SemVer: a breaking change bumps the minor version.
-- Six crates in-repo: `message-broker-svc-core` (v0.2.0 — the in-memory reference
-  implementation, not an "spi"; see architecture.md), `message-broker-svc-spi-shared`
-  (v0.1.0, new — `ValidatorExt`), `-nats-spi` (v0.1.3), `-kafka-spi` (v0.1.3),
-  `-postgres-spi` (v0.1.2), `-saf` (v0.2.1). The `message-broker-svc-core` /
-  `message-broker-svc-inmemory-spi` restructure ([message-broker-svc#2](https://github.com/sweengineeringlabs/message-broker-svc/issues/2))
-  is a breaking change for `core` (its public API is now
-  `InMemoryMessageBroker`/`InMemoryTaskQueue`/`InMemoryConfig`, not
-  `validate_config`/`validator_response`), so each crate's published crates.io version
-  and git tag lag the source here until published/tagged — do not assume the
-  crates.io listing matches this table until that publish step has run. Pre-1.0 SemVer:
-  a breaking change bumps the minor version; `core`'s v0.1.0 → v0.2.0 is one, the
-  `*-spi`/`saf` patch bumps are internal dependency-swap only (no public API change).
-  Each tagged in this repo's own git history to match (`core/v0.2.0`,
-  `spi-shared/v0.1.0`, etc., matching `wasm-capability-pattern`'s own per-crate tag
-  convention). Depends on
+- Five crates in-repo: `message-broker-svc-core` (v0.2.1 — the in-memory reference
+  implementation, not an "spi"; see architecture.md), `-nats-spi` (v0.1.4),
+  `-kafka-spi` (v0.1.4), `-postgres-spi` (v0.1.3), `-saf` (v0.2.2). There is no
+  `message-broker-svc-spi-shared` — it existed briefly (v0.1.0) between
+  [message-broker-svc#2](https://github.com/sweengineeringlabs/message-broker-svc/issues/2)
+  and [message-broker-svc#3](https://github.com/sweengineeringlabs/message-broker-svc/issues/3),
+  then was deleted once `validate_config`/`validator_response` moved directly onto
+  `message-broker-pattern`'s own `Validator` trait — do not depend on it, it is
+  orphaned on crates.io (no corresponding source in this repo). Pre-1.0 SemVer: a
+  breaking change bumps the minor version; internal dependency-swap-only changes (no
+  public API change) bump the patch. Each tagged in this repo's own git history to
+  match (`core/v0.2.1`, `nats-spi/v0.1.4`, etc., matching `wasm-capability-pattern`'s
+  own per-crate tag convention). Depends on
   [`message-broker-pattern`](https://crates.io/crates/message-broker-pattern) by
-  version (`"0.1.0"` or `"0.1.1"` depending on the crate — see "The path + version
-  Dependency Rule" below), not `git` — both repos have published tags now.
+  version (`"0.1.3"` — needed for `Validator::validate_config`/`validator_response` —
+  see "The path + version Dependency Rule" below), not `git`.
 
 ## Working on Any Crate
 
-All six crates are members of `scm/Cargo.toml`, so from `scm/`:
+All five crates are members of `scm/Cargo.toml`, so from `scm/`:
 
 ```
 cargo test --workspace --all-targets
@@ -122,21 +124,22 @@ Adding a new backend means adding a new `spi` crate with its own config type and
 `MessageBrokerFactory` constructor — never touching a shared enum or struct, because
 there isn't one.
 
-## message-broker-svc-spi-shared: the One Shared, Generic Implementation
+## Validator::validate_config/validator_response: the One Shared, Generic Implementation
 
-Every backend's constructor calls `config.validate_config()` (from
-`message_broker_svc_spi_shared::ValidatorExt`) once, before doing any I/O — an extension
-trait over `Validator` with default-implemented `validate_config`/`validator_response`
-methods, blanket-implemented for every `T: Validator`, reused identically by all four
-backends instead of each hand-rolling its own check. Mirrors `ledger`'s own split:
-`LedgerPayload` (trait) lives in `ledger-base-port`; the generic implementation that
-exploits it (`RedbLogStore<P: LedgerPayload>`, etc.) lives in `ledger`'s own
-`adapter/replication` crate, never in the port crate. Adding a fifth backend means
-implementing `Validator` on its own config type — `validate_config`/`validator_response`
-come for free through the trait, not a new function to call. See `architecture.md`'s
-"Why `spi/shared` exists" section for the full reasoning, including why this is an
-extension trait rather than a free-standing helper struct (program to the interface, not
-to the consumer).
+Every backend's constructor calls `config.validate_config()` — from
+`message_broker_pattern::Validator` itself, the same trait every config type already
+implements. No `spi/shared` crate, no extension trait: `validate_config`/
+`validator_response` are default methods declared directly on `Validator` in
+`message-broker-pattern`, reused identically by all four backends instead of each
+hand-rolling its own check. This lived here first, as `message-broker-svc-spi-shared`'s
+`ValidatorExt` extension trait; moved into `message-broker-pattern` itself once checked
+against that crate's own precedent for what "zero implementation" actually rules out
+(implementing a primary trait for a concrete type, not declaring a default method on a
+trait). See `architecture.md`'s "Why `validate_config`/`validator_response` live on
+`Validator` itself, not a `spi/shared` crate" section for the full reasoning. Adding a
+fifth backend means implementing `Validator` on its own config type —
+`validate_config`/`validator_response` come for free through the trait, not a new
+function or extension trait to reach for.
 
 ## The path + version Dependency Rule
 
@@ -144,11 +147,10 @@ to the consumer).
 `version` set — same reasoning as `message-broker-pattern`'s own developer guide (a
 `path`-only dependency makes the crate unpublishable). The `message-broker-pattern`
 dependency is now pinned the same way, by plain version requirement — it was
-`git`/`branch`-pinned only until that repo cut its first published tag. Each crate's
-declared floor (`"0.1.0"` or `"0.1.1"`, not yet bumped uniformly to the latest `0.1.2`)
-resolves to whatever the newest compatible `0.1.x` release is via Cargo's caret
-matching — worth tightening to a consistent floor next time any of these crates
-republishes, but not a functional gap today.
+`git`/`branch`-pinned only until that repo cut its first published tag. Every crate's
+declared floor was bumped to `"0.1.3"` alongside the `Validator::validate_config`/
+`validator_response` move (needed — that method set doesn't exist before 0.1.3), so the
+floor is uniform across every crate in this repo as of that change.
 
 ## Scope
 
