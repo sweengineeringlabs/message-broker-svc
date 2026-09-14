@@ -1,9 +1,11 @@
 # message-broker-svc
 
-> **TLDR:** Concrete in-memory/NATS/Kafka/Postgres `MessageBroker` implementations, plus
-> in-memory/NATS/Kafka `TaskQueue` implementations, on top of
+> **TLDR:** Concrete in-memory/NATS/Kafka/Postgres `MessageBroker` implementations on
+> top of
 > [`message-broker-pattern`](https://github.com/sweengineeringlabs/message-broker-pattern)'s
 > contract. See [Architecture](docs/3-design/architecture.md) for the full design.
+> `TaskQueue` implementations live in the sibling
+> [`task-queue-svc`](https://github.com/sweengineeringlabs/task-queue-svc) repo (SRP).
 
 Extracted from `edge-runtime`'s in-tree pilot
 (`scm/main/message-broker/{spi,saf}`, commits `ec34244`/`16ec508`) per
@@ -26,11 +28,11 @@ let broker = MessageBrokerFactory::in_memory();
 
 | Crate | What it is |
 |-------|------------|
-| [`message-broker-svc-core`](scm/main/message-broker/core) | The technology-free reference implementation: in-memory `MessageBroker` + `TaskQueue` (no external dependency, so not an "spi") |
-| [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | NATS `MessageBroker` + `TaskQueue` |
-| [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | Kafka `MessageBroker` + `TaskQueue` |
-| [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | Postgres `MessageBroker` (no `TaskQueue`) |
-| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` + `TaskQueueFactory` — construction facades consumers depend on |
+| [`message-broker-svc-core`](scm/main/message-broker/core) | The technology-free reference implementation: in-memory `MessageBroker` (no external dependency, so not an "spi") |
+| [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | NATS `MessageBroker` |
+| [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | Kafka `MessageBroker` |
+| [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | Postgres `MessageBroker` |
+| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` — construction facade consumers depend on |
 
 See [Architecture](docs/3-design/architecture.md) for how backend selection works and
 what's deliberately out of scope.

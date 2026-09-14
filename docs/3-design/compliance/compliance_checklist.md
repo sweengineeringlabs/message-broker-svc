@@ -31,14 +31,14 @@ re-run the listed command after any change and expect the stated result.
 | # | Rule | Verify |
 |---|------|--------|
 | 7 | Every `MessageBrokerFactory` constructor returns `Box<dyn MessageBroker>` — never a mix of `impl MessageBroker` and `Box<dyn MessageBroker>` | `grep -n "pub fn \(noop\|in_memory\|nats\|kafka\|postgres\)" main/message-broker/saf/src/broker_factory.rs` — every signature's return type is `Box<dyn MessageBroker>` (or `Result<Box<dyn MessageBroker>, BrokerError>`) |
-| 8 | Every `TaskQueueFactory` constructor returns `Box<dyn TaskQueue>` — never a mix | `grep -n "pub fn \(in_memory\|nats\|kafka\)" main/message-broker/saf/src/task_queue_factory.rs` — every signature's return type is `Box<dyn TaskQueue>` (or `Result<Box<dyn TaskQueue>, QueueError>`) |
-| 9 | Regression test exists proving constructors from different backends unify into one `Vec` | `cargo test -p message-broker-svc-saf --features inmemory,kafka test_kafka_and_noop_constructors_return_the_same_boxed_broker_type` and `cargo test -p message-broker-svc-saf --features inmemory,kafka test_kafka_and_in_memory_constructors_return_the_same_boxed_queue_type` both pass |
+| 8 | Regression test exists proving constructors from different backends unify into one `Vec` | `cargo test -p message-broker-svc-saf --features inmemory,kafka test_kafka_and_noop_constructors_return_the_same_boxed_broker_type` passes |
 
 ## 5. No concrete backend type leaks through `saf`
 
 | # | Rule | Verify |
 |---|------|--------|
-| 10 | `saf`'s own `lib.rs` never re-exports a `spi`/`core` crate's concrete type (`NatsMessageBroker`, `KafkaTaskQueue`, `InMemoryMessageBroker`, etc.), nor its own `pub(crate)` no-op reference | `grep -n "^pub use" main/message-broker/saf/src/lib.rs` shows only `MessageBrokerFactory`/`TaskQueueFactory` — `NoopMessageBroker`/`NoopValidator` stay `pub(crate)`, reachable only via `MessageBrokerFactory::noop()`'s returned trait object |
+| 9 | `saf`'s own `lib.rs` never re-exports a `spi`/`core` crate's concrete type (`NatsMessageBroker`, `InMemoryMessageBroker`, etc.), nor its own `pub(crate)` no-op reference | `grep -n "^pub use" main/message-broker/saf/src/lib.rs` shows only `MessageBrokerFactory` — `NoopMessageBroker`/`NoopValidator` stay `pub(crate)`, reachable only via `MessageBrokerFactory::noop()`'s returned trait object |
+| 10 | No `TaskQueue`-related type lives in this repo anymore (moved to `task-queue-svc`, SRP) | `grep -rln "TaskQueue" main/message-broker/*/src/**/*.rs main/message-broker/saf/src/*.rs` returns nothing outside doc-comment prose pointing to `task-queue-svc` |
 
 ## 6. Scope boundary
 

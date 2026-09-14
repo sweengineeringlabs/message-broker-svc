@@ -24,9 +24,3 @@ pub(crate) const KAFKA_SUBSCRIBE_CHANNEL_CAPACITY: usize = 1024;
 /// dropped, instead of only noticing on the next incoming message — bounding how
 /// long an abandoned subscription can keep its consumer alive.
 pub(crate) const KAFKA_SUBSCRIBE_IDLE_CHECK_SECS: u64 = 5;
-
-/// Kafka dequeue poll timeout in milliseconds.
-///
-/// `dequeue()` waits at most this long for a message before returning `None`.
-/// Sized to keep queue workers responsive without spinning.
-pub(crate) const KAFKA_DEQUEUE_POLL_TIMEOUT_MS: u64 = 100;

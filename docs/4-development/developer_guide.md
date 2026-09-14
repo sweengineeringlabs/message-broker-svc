@@ -18,40 +18,42 @@ message-broker-svc/
 └── scm/
     ├── Cargo.toml          # workspace: [core, spi/*, saf]
     └── main/message-broker/
-        ├── core/              # message-broker-svc-core -- InMemoryMessageBroker + InMemoryTaskQueue (technology-free, not an spi)
+        ├── core/              # message-broker-svc-core -- InMemoryMessageBroker (technology-free, not an spi)
         ├── spi/
-        │   ├── nats-spi/        # message-broker-svc-nats-spi -- *MessageBroker + *TaskQueue
-        │   ├── kafka-spi/       # message-broker-svc-kafka-spi -- *MessageBroker + *TaskQueue
-        │   └── postgres-spi/    # message-broker-svc-postgres-spi -- *MessageBroker only
-        └── saf/              # message-broker-svc-saf -- MessageBrokerFactory, TaskQueueFactory
+        │   ├── nats-spi/        # message-broker-svc-nats-spi -- *MessageBroker
+        │   ├── kafka-spi/       # message-broker-svc-kafka-spi -- *MessageBroker
+        │   └── postgres-spi/    # message-broker-svc-postgres-spi -- *MessageBroker
+        └── saf/              # message-broker-svc-saf -- MessageBrokerFactory
 ```
 
 No `spi/shared` crate — `Validator::validate_config`/`validator_response` live directly
 on `message-broker-pattern`'s own `Validator` trait as default methods; see
 architecture.md's "Why `validate_config`/`validator_response` live on `Validator`
-itself, not a `spi/shared` crate".
+itself, not a `spi/shared` crate". No `TaskQueue` anywhere in this repo either — moved
+to [`task-queue-svc`](https://github.com/sweengineeringlabs/task-queue-svc) (SRP); see
+architecture.md's "Why `TaskQueue` implementations moved out (SRP)".
 
 ## Branching and Releases
 
 - `dev` is the default branch; all work lands there first.
 - `main` gets fast-forwarded to `dev` after a shipped change, not on every commit.
 - Pre-1.0 SemVer: a breaking change bumps the minor version.
-- Five crates in-repo: `message-broker-svc-core` (v0.2.1 — the in-memory reference
-  implementation, not an "spi"; see architecture.md), `-nats-spi` (v0.1.4),
-  `-kafka-spi` (v0.1.4), `-postgres-spi` (v0.1.3), `-saf` (v0.2.2). There is no
-  `message-broker-svc-spi-shared` — it existed briefly (v0.1.0) between
-  [message-broker-svc#2](https://github.com/sweengineeringlabs/message-broker-svc/issues/2)
-  and [message-broker-svc#3](https://github.com/sweengineeringlabs/message-broker-svc/issues/3),
-  then was deleted once `validate_config`/`validator_response` moved directly onto
-  `message-broker-pattern`'s own `Validator` trait — do not depend on it, it is
-  orphaned on crates.io (no corresponding source in this repo). Pre-1.0 SemVer: a
+- Five crates in-repo: `message-broker-svc-core` (v0.3.0 — the in-memory reference
+  implementation, not an "spi"; see architecture.md), `-nats-spi` (v0.2.0),
+  `-kafka-spi` (v0.2.0), `-postgres-spi` (v0.1.4), `-saf` (v0.3.0). There is no
+  `message-broker-svc-spi-shared` (deleted, see previous entries in this history)
+  and no `TaskQueue` anywhere in this repo (moved to `task-queue-svc`, SRP — see
+  [message-broker-pattern](https://github.com/sweengineeringlabs/message-broker-pattern)'s
+  own ADR-002 and this repo's architecture.md). Pre-1.0 SemVer: a
   breaking change bumps the minor version; internal dependency-swap-only changes (no
-  public API change) bump the patch. Each tagged in this repo's own git history to
-  match (`core/v0.2.1`, `nats-spi/v0.1.4`, etc., matching `wasm-capability-pattern`'s
+  public API change) bump the patch — losing a `TaskQueue` export is a breaking
+  change, hence the minor bumps above. Each tagged in this repo's own git history to
+  match (`core/v0.3.0`, `nats-spi/v0.2.0`, etc., matching `wasm-capability-pattern`'s
   own per-crate tag convention). Depends on
-  [`message-broker-pattern`](https://crates.io/crates/message-broker-pattern) by
-  version (`"0.1.3"` — needed for `Validator::validate_config`/`validator_response` —
-  see "The path + version Dependency Rule" below), not `git`.
+  [`message-broker-pattern`](https://github.com/sweengineeringlabs/message-broker-pattern)
+  by `git`+`tag` (`v0.2.0`) — that repo's own crates.io publish is stale (v0.1.2,
+  predates `Validator::validate_config`/`validator_response` and the `TaskQueue`
+  removal); switch back to a version requirement once it publishes v0.2.0.
 
 ## Working on Any Crate
 
@@ -63,11 +65,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-`MessageBrokerFactory::noop()` is always available, no feature required (`TaskQueueFactory`
-has no no-op equivalent). Each real backend's feature is off by default in
-`message-broker-svc-saf` — enable what you're working on. Each feature gates both
-`MessageBrokerFactory`'s and (where one exists) `TaskQueueFactory`'s constructor for
-that backend together — there is no way to enable one without the other:
+`MessageBrokerFactory::noop()` is always available, no feature required. Each real
+backend's feature is off by default in `message-broker-svc-saf` — enable what you're
+working on:
 
 ```
 cargo test --manifest-path main/message-broker/saf/Cargo.toml --features inmemory
@@ -104,13 +104,13 @@ POSTGRES_DSN=postgres://postgres:postgres@localhost:5433/edge_test \
 
 ## No Direct spi Import Outside saf
 
-Enforced, not a style preference: `InMemoryMessageBroker`/`InMemoryTaskQueue`/
-`NatsMessageBroker`/`NatsTaskQueue`/`KafkaMessageBroker`/`KafkaTaskQueue`/
-`PostgresMessageBroker` are `pub` within their own `spi` crates (required for
-`message-broker-svc-saf` to construct them across the crate boundary), but `saf`'s own
-`lib.rs` re-exports only `MessageBrokerFactory`/`TaskQueueFactory` — a consumer
-depending on `message-broker-svc-saf` alone cannot name a concrete backend type
-without also depending directly on that `spi` crate itself.
+Enforced, not a style preference: `InMemoryMessageBroker`/`NatsMessageBroker`/
+`KafkaMessageBroker`/`PostgresMessageBroker` are `pub` within their own `spi` crates
+(required for `message-broker-svc-saf` to construct them across the crate boundary),
+but `saf`'s own `lib.rs` re-exports only `MessageBrokerFactory` — a consumer depending
+on `message-broker-svc-saf` alone cannot name a concrete backend type without also
+depending directly on that `spi` crate itself. (`InMemoryTaskQueue`/`NatsTaskQueue`/
+`KafkaTaskQueue` used to be on this list — moved to `task-queue-svc`, SRP.)
 
 ## Config: Each spi Crate Owns Its Own, None Shared
 
@@ -145,29 +145,40 @@ function or extension trait to reach for.
 
 `message-broker-svc-saf` depends on its sibling `spi` crates with **both** `path` and
 `version` set — same reasoning as `message-broker-pattern`'s own developer guide (a
-`path`-only dependency makes the crate unpublishable). The `message-broker-pattern`
-dependency is now pinned the same way, by plain version requirement — it was
-`git`/`branch`-pinned only until that repo cut its first published tag. Every crate's
-declared floor was bumped to `"0.1.3"` alongside the `Validator::validate_config`/
-`validator_response` move (needed — that method set doesn't exist before 0.1.3), so the
-floor is uniform across every crate in this repo as of that change.
+`path`-only dependency makes the crate unpublishable); this rule is unchanged and
+applies only to intra-repo, same-workspace dependencies.
+
+The `message-broker-pattern` dependency itself is different: every crate in this repo
+now depends on it by `git`+`tag` (`tag = "v0.2.0"`), not by version requirement. This is
+this org's own standing convention for a cross-repo dependency whose target hasn't
+published the needed version to crates.io yet — `message-broker-pattern`'s own
+crates.io publish is stale (v0.1.2, predates both the `Validator::validate_config`/
+`validator_response` move and the `TaskQueue` removal). Switch each of these back to a
+plain version requirement once `message-broker-pattern` publishes v0.2.0 to crates.io.
 
 ## Scope
 
 See `architecture.md`'s Scope boundary section for the current, up-to-date picture.
-Two things were each initially left out of this extraction on the mistaken belief that
-nothing depended on them, and both were later corrected once that belief was checked
+One thing was initially left out of this extraction on the mistaken belief that
+nothing depended on it, and was later corrected once that belief was checked
 against `edge-runtime`'s actual source: the real, `tokio::sync::broadcast`-backed
 in-memory `MessageBroker` (now `message-broker-svc-core`; see architecture.md's
-"Restoring the real in-memory backend") and `TaskQueue` itself, for every backend that
-has one (now `message-broker-svc-core`'s `InMemoryTaskQueue` plus
-`message-broker-svc-{nats,kafka}-spi`'s `*TaskQueue` types and `TaskQueueFactory`; see
-architecture.md's "Scope boundary" `Update (TaskQueue)` note).
-`ApplicationConfig`/`BrokerProvider` (the `BackendKind`-driven `from_config` dispatch
-mechanism itself) remains the one thing genuinely, permanently out of scope — it's
-`edge-runtime`-specific composition, not a migration gap. `NoopMessageBroker` (in
-`-saf`) remains this repo's own no-op reference implementation, distinct from the real
-in-memory backend; there is no no-op `TaskQueue` equivalent.
+"Restoring the real in-memory backend"). `ApplicationConfig`/`BrokerProvider` (the
+`BackendKind`-driven `from_config` dispatch mechanism itself) remains the one thing
+genuinely, permanently out of scope — it's `edge-runtime`-specific composition, not a
+migration gap. `NoopMessageBroker` (in `-saf`) remains this repo's own no-op reference
+implementation, distinct from the real in-memory backend.
+
+**Amendment (SRP):** `TaskQueue` itself, for every backend that had one, was also
+briefly in scope for this repo (`message-broker-svc-core`'s `InMemoryTaskQueue` plus
+`message-broker-svc-{nats,kafka}-spi`'s `*TaskQueue` types and `TaskQueueFactory`) but
+has since moved out entirely, to its own repo pair
+([`task-queue-pattern`](https://github.com/sweengineeringlabs/task-queue-pattern)/
+[`task-queue-svc`](https://github.com/sweengineeringlabs/task-queue-svc)) — `MessageBroker`
+(fan-out/broadcast) and `TaskQueue` (competing-consumer) are different responsibilities
+that happened to share an origin repo, not one responsibility; see architecture.md's
+"Why `TaskQueue` implementations moved out (SRP)". `TaskQueue` is no longer in scope
+for this repo at all, in any form.
 
 ## See Also
 

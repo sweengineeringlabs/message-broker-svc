@@ -1,8 +1,9 @@
 # message-broker-svc-nats-spi
 
-`NatsMessageBroker`/`NatsTaskQueue`: NATS-backed implementations of
-`message-broker-pattern`'s `MessageBroker` and `TaskQueue` traits, via `async-nats`
-(`TaskQueue` uses JetStream for competing-consumer semantics).
+`NatsMessageBroker`: NATS-backed implementation of `message-broker-pattern`'s
+`MessageBroker` trait, via `async-nats`. (The `NatsTaskQueue` implementation that
+used to live here moved to
+[`task-queue-svc`](https://github.com/sweengineeringlabs/task-queue-svc), SRP.)
 
 See [Architecture](../../../../../docs/3-design/architecture.md) for backend
 details and this repo's own history.
