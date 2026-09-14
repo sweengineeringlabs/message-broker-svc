@@ -9,29 +9,36 @@ Six crates — one shared `core`, four `spi` providers, and one `saf` facade:
   `validate_config<C: Validator>` and `validator_response<C: Validator>`. See "Why
   `core` exists" below.
 - **`message-broker-svc-inmemory-spi`** — `InMemoryMessageBroker`
-  (`tokio::sync::broadcast`) + `InMemoryConfig` (no fields — this backend takes no
-  runtime parameters). Real, in-process pub/sub with full fan-out, restoring the
-  functionality `edge-message-broker`'s own extraction left behind — see "Restoring the
-  real in-memory backend" below.
-- **`message-broker-svc-nats-spi`** — `NatsMessageBroker` (`async-nats`) + `NatsConfig`
-  (this crate's own `[message_broker]` TOML config shape: `url`).
-- **`message-broker-svc-kafka-spi`** — `KafkaMessageBroker` (`rdkafka`) + `KafkaConfig`
-  (`url`, `group_id`). Each `subscribe()` call derives its own unique consumer-group ID
-  so multiple subscribers fan out (pub/sub) rather than compete for partitions (Kafka's
-  native behavior within one group).
+  (`tokio::sync::broadcast`) + `InMemoryTaskQueue` (`tokio::sync::mpsc`) +
+  `InMemoryConfig` (no fields — this backend takes no runtime parameters). Real,
+  in-process pub/sub with full fan-out, restoring the functionality
+  `edge-message-broker`'s own extraction left behind — see "Restoring the real
+  in-memory backend" below.
+- **`message-broker-svc-nats-spi`** — `NatsMessageBroker` + `NatsTaskQueue`
+  (`async-nats`, `TaskQueue` via JetStream for competing-consumer semantics) +
+  `NatsConfig` (this crate's own `[message_broker]` TOML config shape: `url`).
+- **`message-broker-svc-kafka-spi`** — `KafkaMessageBroker` + `KafkaTaskQueue`
+  (`rdkafka`) + `KafkaConfig` (`url`, `group_id`). Each `MessageBroker::subscribe()`
+  call derives its own unique consumer-group ID so multiple subscribers fan out
+  (pub/sub) rather than compete for partitions (Kafka's native behavior within one
+  group); `KafkaTaskQueue` uses the caller-supplied `group_id` directly, since
+  competing consumption is exactly what a task queue wants.
 - **`message-broker-svc-postgres-spi`** — `PostgresMessageBroker` (`sqlx` + the `pgmq`
   Postgres extension) + `PostgresConfig` (`url`, `queue_name`). Delivery is **queue**
   semantics (one consumer per message), not broadcast — the one backend here that
-  doesn't fan out.
+  doesn't fan out. No `TaskQueue` implementation — `edge-runtime`'s original pilot
+  never had one for Postgres either.
 - **`message-broker-svc-saf`** — `MessageBrokerFactory`, plus the reference no-op
   implementation (`NoopMessageBroker`/`NoopValidator`, `pub(crate)`, reachable only via
   `MessageBrokerFactory::noop()`). A consumer depends on `message-broker-pattern` +
   `message-broker-svc-saf` alone and never imports a `spi` crate directly — enforced,
   not a convention left to discipline (`NatsMessageBroker` etc. are `pub` within their
-  own `spi` crates only, never re-exported from `saf`).
+  own `spi` crates only, never re-exported from `saf`). Does not yet construct any
+  `TaskQueue` backend — a `TaskQueueFactory` mirroring `MessageBrokerFactory` is
+  tracked separately.
 
-Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`Validator`
-traits and value types), `message-broker-svc-core` (the one shared, generic
+Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`TaskQueue`/
+`Validator` traits and value types), `message-broker-svc-core` (the one shared, generic
 implementation every backend reuses), and whatever technology client it wraps —
 `message-broker-svc-saf` is the only thing that depends on all four `spi` crates
 together.
@@ -148,15 +155,15 @@ real dependency direction (`-saf` depends on the `spi` crates, not the reverse).
 ```mermaid
 flowchart TD
     subgraph pattern["message-broker-pattern"]
-        contract["MessageBroker, Validator, Message"]
+        contract["MessageBroker, TaskQueue, Validator, Message, Task"]
     end
 
     subgraph svc["message-broker-svc"]
         core["message-broker-svc-core<br/>validate_config, validator_response"]
         saf["message-broker-svc-saf<br/>MessageBrokerFactory, NoopMessageBroker"]
-        inmemory["message-broker-svc-inmemory-spi<br/>InMemoryMessageBroker + InMemoryConfig"]
-        nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsConfig"]
-        kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaConfig"]
+        inmemory["message-broker-svc-inmemory-spi<br/>InMemoryMessageBroker + InMemoryTaskQueue + InMemoryConfig"]
+        nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsTaskQueue + NatsConfig"]
+        kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaTaskQueue + KafkaConfig"]
         postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker + PostgresConfig"]
 
         inmemory -->|implements| contract
@@ -213,16 +220,11 @@ closed-enum version of it internally.
 
 ## Scope boundary
 
-This repo covers only `message-broker-pattern`'s `MessageBroker` trait, extracted from
-`edge-runtime`'s own in-tree pilot (`ec34244`/`16ec508`). Several things from that pilot
-were deliberately **not** ported:
+This repo covers `message-broker-pattern`'s `MessageBroker` **and** `TaskQueue` traits
+(both now live in that one pattern crate — see its own architecture doc), extracted
+from `edge-runtime`'s own in-tree pilot (`ec34244`/`16ec508`). One thing from that
+pilot remains deliberately **not** ported:
 
-- **`TaskQueue`** — `edge-runtime`'s own richer contract
-  (`runtime-message-broker-contract`, a superset of this contract adding `TaskQueue`/
-  `Task`/`TaskHandle`) and each backend's `*TaskQueue` implementation. `KafkaMessageBroker`
-  and `NatsMessageBroker` were split cleanly from their `*TaskQueue` siblings in the
-  source they were extracted from (separate files, no shared state), so this was a clean
-  cut, not a partial one.
 - **`ApplicationConfig`/`BrokerProvider`** — `edge-runtime`-specific composition
   abstractions layered on top of `MessageBrokerFactory`, and the `BackendKind`-driven
   `from_config` dispatch mechanism itself. Not part of `message-broker-pattern`, and
@@ -230,12 +232,27 @@ were deliberately **not** ported:
   backend" above for why the *backend itself* (unlike this dispatch layer) has since
   been ported.
 
-**Update**: the real, `tokio::sync::broadcast`-backed in-memory backend
-(`edge-runtime`'s own `runtime-message-broker-core::InMemoryMessageBroker`) was
-initially left out alongside these, on the belief that nothing outside
+**Update (in-memory backend)**: the real, `tokio::sync::broadcast`-backed in-memory
+`MessageBroker` (`edge-runtime`'s own `runtime-message-broker-core::InMemoryMessageBroker`)
+was initially left out alongside the above, on the belief that nothing outside
 `edge-message-broker` depended on it. That belief was wrong — see "Restoring the real
 in-memory backend" above — and this backend now ships here as
 `message-broker-svc-inmemory-spi`, distinct from `NoopMessageBroker` (which still just
 discards published messages; `MessageBrokerFactory::noop()` is unchanged).
+
+**Update (`TaskQueue`)**: this repo originally excluded `TaskQueue` entirely —
+`edge-runtime`'s own richer contract (`runtime-message-broker-contract`, a superset
+adding `TaskQueue`/`Task`/`TaskHandle`) and each backend's `*TaskQueue` implementation
+— reasoning that `KafkaMessageBroker`/`NatsMessageBroker` split cleanly from their
+`*TaskQueue` siblings in the source they were extracted from (separate files, no shared
+state), so leaving `TaskQueue` out was a clean cut. That framed it as a scope decision;
+it was actually the same class of gap as the in-memory backend above — `TaskQueue`
+belongs in `message-broker-pattern` alongside `MessageBroker`, and a consumer is
+supposed to get this domain's whole primitive set from `message-broker-pattern` plus
+this repo, not half of it redefined downstream in `edge-runtime`. `TaskQueue` is now
+implemented here too: `message-broker-svc-inmemory-spi::InMemoryTaskQueue`,
+`message-broker-svc-nats-spi::NatsTaskQueue`, `message-broker-svc-kafka-spi::KafkaTaskQueue`
+(`message-broker-svc-postgres-spi` has none — Postgres/`pgmq` never had a `TaskQueue`
+backend in `edge-runtime`'s original pilot either).
 
 [← Docs index](../README.md)

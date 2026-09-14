@@ -1,12 +1,12 @@
 [package]
 name         = "message-broker-svc-kafka-spi"
-version      = "0.1.1"
+version      = "0.1.2"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
 repository   = "https://github.com/sweengineeringlabs/message-broker-svc"
 rust-version = "1.98"
-description  = "message-broker-svc Kafka SPI: rdkafka-backed MessageBroker implementation. Extracted from edge-runtime's runtime-message-broker-kafka-spi per edge-message-broker#6."
+description  = "message-broker-svc Kafka SPI: rdkafka-backed MessageBroker and TaskQueue implementations. Extracted from edge-runtime's runtime-message-broker-kafka-spi per edge-message-broker#6."
 keywords     = ["message-broker", "kafka", "spi", "async", "swe"]
 categories   = ["network-programming", "asynchronous"]
 
@@ -19,13 +19,16 @@ name = "message_broker_svc_kafka_spi"
 path = "src/lib.rs"
 
 [dependencies]
-message-broker-pattern = "0.1.0"
+message-broker-pattern = "0.1.1"
 message-broker-svc-core = { path = "../../core", version = "0.1.0" }
 configbuilder = "0.8"
 serde    = { version = "1.0", features = ["derive"] }
 futures  = "0.3"
 tokio    = { version = "1.52", features = ["sync", "rt", "time"] }
 rdkafka  = { version = "0.39", features = ["tokio", "cmake-build"] }
+bytes    = "1"
+uuid     = "1.23"
+tracing  = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 tokio    = { version = "1.52", features = ["rt-multi-thread", "macros"] }
