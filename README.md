@@ -26,31 +26,14 @@ let broker = MessageBrokerFactory::in_memory();
 
 | Crate | What it is |
 |-------|------------|
-| [`message-broker-svc-inmemory-spi`](scm/main/message-broker/spi/inmemory-spi) | `InMemoryMessageBroker` (`tokio::sync::broadcast`) + `InMemoryTaskQueue` (`tokio::sync::mpsc`) |
-| [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | `NatsMessageBroker` + `NatsTaskQueue` — `async-nats`-backed |
-| [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | `KafkaMessageBroker` + `KafkaTaskQueue` — `rdkafka`-backed |
-| [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | `PostgresMessageBroker` — `pgmq`-backed; no `TaskQueue` (`edge-runtime`'s original pilot never had one for Postgres) |
-| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` + `TaskQueueFactory` — the construction facades consumers depend on |
+| [`message-broker-svc-inmemory-spi`](scm/main/message-broker/spi/inmemory-spi) | In-memory `MessageBroker` + `TaskQueue` |
+| [`message-broker-svc-nats-spi`](scm/main/message-broker/spi/nats-spi) | NATS `MessageBroker` + `TaskQueue` |
+| [`message-broker-svc-kafka-spi`](scm/main/message-broker/spi/kafka-spi) | Kafka `MessageBroker` + `TaskQueue` |
+| [`message-broker-svc-postgres-spi`](scm/main/message-broker/spi/postgres-spi) | Postgres `MessageBroker` (no `TaskQueue`) |
+| [`message-broker-svc-saf`](scm/main/message-broker/saf) | `MessageBrokerFactory` + `TaskQueueFactory` — construction facades consumers depend on |
 
-No `BackendKind` enum, no shared config struct, no `from_config` dispatch — each `spi`
-crate owns its own config type (`InMemoryConfig`/`NatsConfig`/`KafkaConfig`/`PostgresConfig`),
-`MessageBrokerFactory` exposes five independent, directly-typed constructors
-(`noop`/`in_memory`/`nats`/`kafka`/`postgres`), and `TaskQueueFactory` mirrors it with
-three more (`in_memory`/`nats`/`kafka`, no `postgres`, no no-op) — none of it a
-runtime-selectable registry. See [Architecture](docs/3-design/architecture.md) for why.
-
-**Scope note:** this repo covers `message-broker-pattern`'s `MessageBroker` *and*
-`TaskQueue` traits — both now live in that one pattern crate. `TaskQueue` was initially
-left out here (and left behind in `edge-runtime`'s own local copy of the contract) on
-the belief that was a deliberate scope boundary; it wasn't — a consumer is supposed to
-get this domain's whole primitive set from `message-broker-pattern` plus this repo, not
-half of it redefined downstream. `ApplicationConfig`/`BrokerProvider` (an
-`edge-runtime`-specific composition layer, including the `BackendKind`-driven
-`from_config` dispatch mechanism) remains the one thing genuinely out of scope — it's
-`edge-runtime`-specific by nature, not a migration gap. See
-[Architecture](docs/3-design/architecture.md) for the full reasoning, including why the
-in-memory backend is real (not `noop`'s stand-in) and why backend selection is five
-independent constructors rather than a config-driven dispatch.
+See [Architecture](docs/3-design/architecture.md) for how backend selection works and
+what's deliberately out of scope.
 
 ## Documentation
 
