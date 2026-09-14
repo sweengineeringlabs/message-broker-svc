@@ -28,14 +28,14 @@ Six crates — one shared `core`, four `spi` providers, and one `saf` facade:
   semantics (one consumer per message), not broadcast — the one backend here that
   doesn't fan out. No `TaskQueue` implementation — `edge-runtime`'s original pilot
   never had one for Postgres either.
-- **`message-broker-svc-saf`** — `MessageBrokerFactory`, plus the reference no-op
-  implementation (`NoopMessageBroker`/`NoopValidator`, `pub(crate)`, reachable only via
-  `MessageBrokerFactory::noop()`). A consumer depends on `message-broker-pattern` +
-  `message-broker-svc-saf` alone and never imports a `spi` crate directly — enforced,
-  not a convention left to discipline (`NatsMessageBroker` etc. are `pub` within their
-  own `spi` crates only, never re-exported from `saf`). Does not yet construct any
-  `TaskQueue` backend — a `TaskQueueFactory` mirroring `MessageBrokerFactory` is
-  tracked separately.
+- **`message-broker-svc-saf`** — `MessageBrokerFactory` (`noop`/`in_memory`/`nats`/
+  `kafka`/`postgres`) and `TaskQueueFactory` (`in_memory`/`nats`/`kafka`, no
+  `postgres`), plus the reference no-op implementation (`NoopMessageBroker`/
+  `NoopValidator`, `pub(crate)`, reachable only via `MessageBrokerFactory::noop()`).
+  A consumer depends on `message-broker-pattern` + `message-broker-svc-saf` alone
+  and never imports a `spi` crate directly — enforced, not a convention left to
+  discipline (`NatsMessageBroker`/`NatsTaskQueue` etc. are `pub` within their own
+  `spi` crates only, never re-exported from `saf`).
 
 Each `spi` crate depends on `message-broker-pattern` (the `MessageBroker`/`TaskQueue`/
 `Validator` traits and value types), `message-broker-svc-core` (the one shared, generic
@@ -160,16 +160,16 @@ flowchart TD
 
     subgraph svc["message-broker-svc"]
         core["message-broker-svc-core<br/>validate_config, validator_response"]
-        saf["message-broker-svc-saf<br/>MessageBrokerFactory, NoopMessageBroker"]
+        saf["message-broker-svc-saf<br/>MessageBrokerFactory, TaskQueueFactory,<br/>NoopMessageBroker"]
         inmemory["message-broker-svc-inmemory-spi<br/>InMemoryMessageBroker + InMemoryTaskQueue + InMemoryConfig"]
         nats["message-broker-svc-nats-spi<br/>NatsMessageBroker + NatsTaskQueue + NatsConfig"]
         kafka["message-broker-svc-kafka-spi<br/>KafkaMessageBroker + KafkaTaskQueue + KafkaConfig"]
-        postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker + PostgresConfig"]
+        postgres["message-broker-svc-postgres-spi<br/>PostgresMessageBroker (no TaskQueue) + PostgresConfig"]
 
-        inmemory -->|implements| contract
-        nats -->|implements| contract
-        kafka -->|implements| contract
-        postgres -->|implements| contract
+        inmemory -->|implements MessageBroker + TaskQueue| contract
+        nats -->|implements MessageBroker + TaskQueue| contract
+        kafka -->|implements MessageBroker + TaskQueue| contract
+        postgres -->|implements MessageBroker| contract
         saf -->|implements| contract
         core -->|generic over| contract
 
@@ -185,7 +185,7 @@ flowchart TD
     end
 ```
 
-## Dispatch: four independent constructors, no shared selection type
+## Dispatch: independent constructors per trait, no shared selection type
 
 `MessageBrokerFactory::noop()` / `::in_memory()` / `::nats(url)` /
 `::kafka(brokers, group_id)` / `::postgres(dsn, queue_name)` — five independent,
@@ -196,7 +196,7 @@ A given build of this crate compiles in whichever features are turned on; the ca
 already knows, at the point they write the one line calling a specific constructor,
 which backend that build is for.
 
-All four return `Box<dyn MessageBroker>` — not three returning opaque
+All five return `Box<dyn MessageBroker>` — not four returning opaque
 `impl MessageBroker` and one (`noop`) returning `Box<dyn MessageBroker>`, which is what
 this looked like before an audit pass caught the inconsistency. `impl Trait` in return
 position is a distinct anonymous type per function; a caller who picks a backend at
@@ -208,6 +208,18 @@ result now behaves identically as far as the caller is concerned, and
 `message_broker_factory_int_test.rs::test_kafka_and_noop_constructors_return_the_same_boxed_broker_type`
 is a real regression test for it — before this fix, that test's own `Vec<Box<dyn
 MessageBroker>>` literal would have failed to *compile*, not just to pass.
+
+`TaskQueueFactory::in_memory()` / `::nats(nats_url, stream_name, consumer_group)` /
+`::kafka(brokers, group_id, topic)` — the same shape, one crate over: three
+independent, directly-typed, feature-gated constructors, no `postgres` (no
+`TaskQueue` backend exists for it) and no no-op reference (no `TaskQueue`
+equivalent of `noop()` exists either — a task queue that always returns `None`
+from `dequeue()` was judged not worth a dedicated type). All three return
+`Box<dyn TaskQueue>`, for the same reason `MessageBrokerFactory`'s five
+constructors were unified: a caller collecting queues from more than one
+constructor into one `Vec` needs them to actually be the same type.
+`kafka_task_queue_int_test.rs::test_kafka_and_in_memory_constructors_return_the_same_boxed_queue_type`
+is `TaskQueueFactory`'s own version of that regression test.
 
 **This is deliberate, not an oversight.** A `from_config` that matches on a
 "which-backend" value and constructs the matching one of several compiled-in
