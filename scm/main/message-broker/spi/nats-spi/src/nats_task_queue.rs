@@ -98,6 +98,29 @@ impl NatsTaskQueue {
         })
     }
 
+    /// Connect to a NATS server and return a JetStream-backed task queue.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QueueError::Connection`] if `nats_url` is blank or the NATS
+    /// server is unreachable.
+    pub async fn connect(
+        nats_url: &str,
+        stream_name: String,
+        consumer_group: String,
+    ) -> Result<Self, QueueError> {
+        if nats_url.trim().is_empty() {
+            return Err(QueueError::Connection(
+                "nats backend requires a non-empty `nats_url`".to_owned(),
+            ));
+        }
+        let connection = async_nats::connect(nats_url)
+            .await
+            .map_err(|e| QueueError::Connection(e.to_string()))?;
+        let jetstream_context = async_nats::jetstream::new(connection);
+        Self::new(jetstream_context, stream_name, consumer_group).await
+    }
+
     /// Get or create the durable consumer for this queue.
     async fn get_or_create_consumer(
         &self,
