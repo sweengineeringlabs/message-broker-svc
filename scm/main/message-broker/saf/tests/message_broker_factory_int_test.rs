@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use message_broker_pattern::HealthCheckRequest;
+use message_broker_pattern::{HealthCheckRequest, MessageBroker};
 use message_broker_svc_saf::MessageBrokerFactory;
 
 /// @covers: noop
@@ -40,19 +40,21 @@ async fn test_noop_publish_then_subscribe_is_inert() {
     );
 }
 
-/// @covers: noop, kafka — both return `Box<dyn MessageBroker>`, so a caller
-/// can unify brokers picked from different constructors into one `Vec`
-/// (or one `if`/`else` branch) without manually boxing any of them itself.
-/// Before `kafka` returned this same boxed type, this test would fail to
+/// @covers: noop, kafka — both return [`AnyMessageBroker`], so a caller can
+/// unify brokers picked from different constructors into one `Vec` (or one
+/// `if`/`else` branch) without manually boxing any of them itself, and
+/// without paying for a `Box<dyn MessageBroker>` (which no longer exists —
+/// `MessageBroker` isn't object-safe once its methods return `impl Future`).
+/// Before `kafka` returned this same enum, this test would fail to
 /// *compile*, not just fail to pass: `impl MessageBroker` is a distinct
 /// anonymous type per call site, not assignable alongside `noop()`'s
-/// `Box<dyn MessageBroker>` in one `Vec`.
+/// `AnyMessageBroker` in one `Vec`.
 #[cfg(feature = "kafka")]
 #[test]
-fn test_kafka_and_noop_constructors_return_the_same_boxed_broker_type() {
-    use message_broker_pattern::MessageBroker;
+fn test_kafka_and_noop_constructors_return_the_same_broker_type() {
+    use message_broker_svc_saf::AnyMessageBroker;
 
-    let brokers: Vec<Box<dyn MessageBroker>> = vec![
+    let brokers: Vec<AnyMessageBroker> = vec![
         MessageBrokerFactory::noop(),
         MessageBrokerFactory::kafka("127.0.0.1:9999", "test-group")
             .expect("kafka client construction succeeds before first IO"),

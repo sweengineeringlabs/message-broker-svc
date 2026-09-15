@@ -275,18 +275,22 @@ A given build of this crate compiles in whichever features are turned on; the ca
 already knows, at the point they write the one line calling a specific constructor,
 which backend that build is for.
 
-All five return `Box<dyn MessageBroker>` — not four returning opaque
-`impl MessageBroker` and one (`noop`) returning `Box<dyn MessageBroker>`, which is what
-this looked like before an audit pass caught the inconsistency. `impl Trait` in return
-position is a distinct anonymous type per function; a caller who picks a backend at
-runtime (`if cfg.backend == "kafka" { ... } else { MessageBrokerFactory::noop() }`)
-could not have unified three of these four constructors into one variable without
-manually boxing them itself — the trait was supposed to hide exactly that construction
-detail, but three call sites leaked it anyway. Fixed uniformly; every constructor's
-result now behaves identically as far as the caller is concerned, and
-`message_broker_factory_int_test.rs::test_kafka_and_noop_constructors_return_the_same_boxed_broker_type`
-is a real regression test for it — before this fix, that test's own `Vec<Box<dyn
-MessageBroker>>` literal would have failed to *compile*, not just to pass.
+All five return one common type — not four returning opaque `impl MessageBroker`
+and one (`noop`) returning something boxed, which is what this looked like before
+an audit pass caught the inconsistency (`impl Trait` in return position is a
+distinct anonymous type per function; a caller who picks a backend at runtime
+(`if cfg.backend == "kafka" { ... } else { MessageBrokerFactory::noop() }`) could
+not have unified three of the four constructors into one variable without
+manually boxing them itself). Fixed uniformly; every constructor's result now
+behaves identically as far as the caller is concerned, and
+`message_broker_factory_int_test.rs::test_kafka_and_noop_constructors_return_the_same_broker_type`
+is a real regression test for it.
+
+That common type used to be `Box<dyn MessageBroker>`; it's
+[`AnyMessageBroker`](https://github.com/sweengineeringlabs/message-broker-svc/blob/main/scm/main/message-broker/saf/src/any_message_broker.rs)
+now — see "Why `AnyMessageBroker`, not `Box<dyn MessageBroker>`" below for why,
+and why the uniform-return-type property this paragraph describes didn't change,
+only how it's achieved.
 
 `task-queue-svc-saf`'s own `TaskQueueFactory` mirrors this exact shape, one
 repo over — see that repo's own architecture doc for its dispatch table.
@@ -299,6 +303,43 @@ repo represents exactly one implementation at a time per build; a caller that ne
 runtime selection among multiple named backends builds that on top using
 `runtime-svc-registry`'s own pattern, rather than this repo reinventing a bespoke,
 closed-enum version of it internally.
+
+## Why `AnyMessageBroker`, not `Box<dyn MessageBroker>`
+
+Raised as a real, checked zero-cost abstraction question in
+[message-broker-svc#5](https://github.com/sweengineeringlabs/message-broker-svc/issues/5),
+downstream of
+[message-broker-pattern#3](https://github.com/sweengineeringlabs/message-broker-pattern/issues/3):
+once `MessageBroker`'s methods return `impl Future` instead of a boxed future
+(zero-cost, no per-call heap allocation), the trait is no longer object-safe —
+`Box<dyn MessageBroker>`, which every `MessageBrokerFactory` constructor used to
+return, doesn't compile anymore. This repo genuinely needs a uniform return type
+across all five constructors (see "Dispatch" above) — a real, config-driven
+runtime backend-selection need, unlike single-backend `-svc` repos in this org
+(`scheduler-svc`, `oltp-svc`, `olap-svc`, `pipeline-svc`), which just return
+`impl Trait` directly once they lost object safety the same way.
+
+`AnyMessageBroker` (`saf/src/any_message_broker.rs`) is a plain enum, one variant
+per backend, implementing `MessageBroker` by matching on `self` and delegating —
+`match self { Self::Kafka(b) => b.publish(request).await, ... }`. Zero-cost: no
+heap allocation, no vtable. A `match` compiles to a jump table, and the `async fn`
+this compiles into generates one state machine per method, sized to fit whichever
+variant is active — not a boxed future. `MessageBrokerFactory`'s five constructors
+each wrap their own concrete backend in the matching variant and return
+`AnyMessageBroker` uniformly, same call-site ergonomics as the `Box<dyn
+MessageBroker>` it replaces.
+
+This is not the `BackendKind`-style dispatch enum "Dispatch" above explicitly
+rejects — that anti-pattern is a *runtime-loaded name* driving *which
+constructor to call* (`from_config`-style dispatch, the `runtime-svc-registry`
+job). `AnyMessageBroker` drives nothing; it's the type a constructor's *result*
+happens to be, decided by which constructor the caller already chose to call at
+its own call site. The same distinction holds for `NoopMessageBroker`'s
+visibility: it moved from `pub(crate)` to `pub` (within this crate only, never
+re-exported from `saf`'s `lib.rs`) purely because it's now a variant payload of
+the public `AnyMessageBroker` enum — not reachable to construct from outside this
+crate, so the "no consumer depends on a `spi` crate just to use the factory"
+property from "Overview" above is unchanged.
 
 ## Scope boundary
 

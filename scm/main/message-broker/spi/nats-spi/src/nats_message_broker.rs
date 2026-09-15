@@ -1,12 +1,12 @@
 //! [`NatsMessageBroker`] — NATS-backed message broker via `async-nats`.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 
 use futures::StreamExt;
 
 use message_broker_pattern::BrokerError;
-use message_broker_pattern::BrokerFuture;
 use message_broker_pattern::HealthCheckRequest;
 use message_broker_pattern::Message;
 use message_broker_pattern::MessageBroker;
@@ -89,9 +89,12 @@ impl NatsMessageBroker {
 }
 
 impl MessageBroker for NatsMessageBroker {
-    fn publish<'a>(&'a self, request: PublishRequest) -> BrokerFuture<'a, Result<(), BrokerError>> {
+    fn publish(
+        &self,
+        request: PublishRequest,
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let client = self.client.clone();
-        BrokerFuture::new(async move {
+        async move {
             let headers = encode_headers(&request.message.headers);
             let payload = request.message.payload.clone();
             client
@@ -101,15 +104,15 @@ impl MessageBroker for NatsMessageBroker {
                     topic: request.topic,
                     reason: e.to_string(),
                 })
-        })
+        }
     }
 
-    fn subscribe<'a>(
-        &'a self,
+    fn subscribe(
+        &self,
         request: SubscribeRequest,
-    ) -> BrokerFuture<'a, Result<SubscribeResponse, BrokerError>> {
+    ) -> impl Future<Output = Result<SubscribeResponse, BrokerError>> + Send + '_ {
         let client = self.client.clone();
-        BrokerFuture::new(async move {
+        async move {
             let subscriber = client.subscribe(request.topic.clone()).await.map_err(|e| {
                 BrokerError::Subscribe {
                     topic: request.topic,
@@ -127,15 +130,15 @@ impl MessageBroker for NatsMessageBroker {
             Ok(SubscribeResponse {
                 stream: Box::pin(stream) as MessageStream,
             })
-        })
+        }
     }
 
     fn health_check(
         &self,
         _request: HealthCheckRequest,
-    ) -> BrokerFuture<'_, Result<(), BrokerError>> {
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let client = self.client.clone();
-        BrokerFuture::new(async move {
+        async move {
             // `server_info()` is a cached, no-I/O getter populated once at
             // connect time — it keeps returning the original snapshot even
             // after the connection has actually died, so it can never report
@@ -149,7 +152,7 @@ impl MessageBroker for NatsMessageBroker {
                     ))
                 })?
                 .map_err(|e| BrokerError::Connection(e.to_string()))
-        })
+        }
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {

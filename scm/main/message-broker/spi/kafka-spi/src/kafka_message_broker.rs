@@ -1,6 +1,7 @@
 //! [`KafkaMessageBroker`] — Apache Kafka backed pub/sub broker via `rdkafka`.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use rdkafka::producer::{FutureProducer, FutureRecord, Producer as _};
 use rdkafka::types::RDKafkaErrorCode;
 
 use message_broker_pattern::BrokerError;
-use message_broker_pattern::BrokerFuture;
 use message_broker_pattern::HealthCheckRequest;
 use message_broker_pattern::Message;
 use message_broker_pattern::MessageBroker;
@@ -139,9 +139,12 @@ impl KafkaMessageBroker {
 }
 
 impl MessageBroker for KafkaMessageBroker {
-    fn publish<'a>(&'a self, request: PublishRequest) -> BrokerFuture<'a, Result<(), BrokerError>> {
+    fn publish(
+        &self,
+        request: PublishRequest,
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let producer = self.producer.clone();
-        BrokerFuture::new(async move {
+        async move {
             let headers = encode_headers(&request.message.headers);
             producer
                 .send(
@@ -159,18 +162,18 @@ impl MessageBroker for KafkaMessageBroker {
                     topic: request.topic,
                     reason: e.to_string(),
                 })
-        })
+        }
     }
 
-    fn subscribe<'a>(
-        &'a self,
+    fn subscribe(
+        &self,
         request: SubscribeRequest,
-    ) -> BrokerFuture<'a, Result<SubscribeResponse, BrokerError>> {
+    ) -> impl Future<Output = Result<SubscribeResponse, BrokerError>> + Send + '_ {
         let topic = request.topic;
         let brokers = self.brokers.clone();
         // Unique per subscription — see `unique_subscriber_group_id` doc comment.
         let group_id = unique_subscriber_group_id(&self.group_id);
-        BrokerFuture::new(async move {
+        async move {
             let consumer: Arc<StreamConsumer> = Arc::new(
                 ClientConfig::new()
                     .set("bootstrap.servers", &brokers)
@@ -250,15 +253,15 @@ impl MessageBroker for KafkaMessageBroker {
             Ok(SubscribeResponse {
                 stream: Box::pin(rx) as MessageStream,
             })
-        })
+        }
     }
 
     fn health_check(
         &self,
         _request: HealthCheckRequest,
-    ) -> BrokerFuture<'_, Result<(), BrokerError>> {
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let producer = self.producer.clone();
-        BrokerFuture::new(async move {
+        async move {
             tokio::task::spawn_blocking(move || {
                 producer
                     .client()
@@ -273,7 +276,7 @@ impl MessageBroker for KafkaMessageBroker {
             })
             .await
             .map_err(|e| BrokerError::Connection(format!("health check task failed: {e}")))?
-        })
+        }
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {

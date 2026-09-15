@@ -11,7 +11,9 @@ mod inmemory_feature {
     use std::sync::Arc;
 
     use futures::StreamExt as _;
-    use message_broker_pattern::{HealthCheckRequest, Message, PublishRequest, SubscribeRequest};
+    use message_broker_pattern::{
+        HealthCheckRequest, Message, MessageBroker, PublishRequest, SubscribeRequest,
+    };
     use message_broker_svc_saf::MessageBrokerFactory;
 
     /// @covers: MessageBrokerFactory::in_memory

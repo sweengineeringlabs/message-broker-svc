@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use message_broker_pattern::{
-    BrokerError, BrokerFuture, HealthCheckRequest, MessageBroker, MessageStream, PublishRequest,
+    BrokerError, HealthCheckRequest, MessageBroker, MessageStream, PublishRequest,
     SubscribeRequest, SubscribeResponse, Validator, ValidatorRequest, ValidatorResponse,
 };
 
@@ -27,31 +27,29 @@ fn noop_validator_handle() -> Arc<NoopValidator> {
 
 /// No-op [`MessageBroker`]: `publish` succeeds without delivery, `subscribe`
 /// returns an empty stream, `health_check` always reports healthy.
-pub(crate) struct NoopMessageBroker;
+///
+/// `pub`, not `pub(crate)`: it's a variant payload of the public
+/// [`crate::AnyMessageBroker`] enum, so it must be at least as visible as
+/// that enum itself. Still unreachable to construct from outside this
+/// crate -- there is no public constructor, only
+/// [`crate::MessageBrokerFactory::noop`], which returns it already wrapped.
+pub struct NoopMessageBroker;
 
 impl MessageBroker for NoopMessageBroker {
-    fn publish<'a>(
-        &'a self,
-        _request: PublishRequest,
-    ) -> BrokerFuture<'a, Result<(), BrokerError>> {
-        BrokerFuture::new(async { Ok(()) })
+    async fn publish(&self, _request: PublishRequest) -> Result<(), BrokerError> {
+        Ok(())
     }
 
-    fn subscribe<'a>(
-        &'a self,
-        _request: SubscribeRequest,
-    ) -> BrokerFuture<'a, Result<SubscribeResponse, BrokerError>> {
-        BrokerFuture::new(async {
-            let stream: MessageStream = Box::pin(futures::stream::empty());
-            Ok(SubscribeResponse { stream })
-        })
-    }
-
-    fn health_check(
+    async fn subscribe(
         &self,
-        _request: HealthCheckRequest,
-    ) -> BrokerFuture<'_, Result<(), BrokerError>> {
-        BrokerFuture::new(async { Ok(()) })
+        _request: SubscribeRequest,
+    ) -> Result<SubscribeResponse, BrokerError> {
+        let stream: MessageStream = Box::pin(futures::stream::empty());
+        Ok(SubscribeResponse { stream })
+    }
+
+    async fn health_check(&self, _request: HealthCheckRequest) -> Result<(), BrokerError> {
+        Ok(())
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {

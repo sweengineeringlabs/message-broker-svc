@@ -4,6 +4,8 @@ Alphabetized list of terms used in `message-broker-svc`.
 
 ---
 
+**AnyMessageBroker** - Zero-cost enum in `message-broker-svc-saf`, one variant per backend (`Noop`/`InMemory`/`Nats`/`Kafka`/`Postgres`), implementing `MessageBroker` by matching on `self` and delegating. The uniform return type every `MessageBrokerFactory` constructor returns — replaces `Box<dyn MessageBroker>`, which stopped compiling once `MessageBroker` lost object safety (its methods return `impl Future`, not a boxed one). See `docs/3-design/architecture.md`'s "Why `AnyMessageBroker`, not `Box<dyn MessageBroker>`".
+
 **InMemoryConfig** - `message-broker-svc-core`'s config type. No fields — this backend takes no runtime parameters.
 
 **InMemoryMessageBroker** - In-process `MessageBroker` backed by `tokio::sync::broadcast`. Real, full-fanout pub/sub, distinct from `NoopMessageBroker`.
@@ -12,13 +14,13 @@ Alphabetized list of terms used in `message-broker-svc`.
 
 **KafkaMessageBroker** - `MessageBroker` backed by `rdkafka`. Each `subscribe()` call derives its own unique consumer-group ID so multiple subscribers fan out rather than compete for partitions.
 
-**MessageBrokerFactory** - Construction facade in `message-broker-svc-saf`: `noop`/`in_memory`/`nats`/`kafka`/`postgres`, all returning `Box<dyn MessageBroker>`. No shared "which backend" type, no config-driven runtime dispatch.
+**MessageBrokerFactory** - Construction facade in `message-broker-svc-saf`: `noop`/`in_memory`/`nats`/`kafka`/`postgres`, all returning `AnyMessageBroker`. No shared "which backend" type, no config-driven runtime dispatch.
 
 **NatsConfig** - `message-broker-svc-nats-spi`'s config type (`url`).
 
 **NatsMessageBroker** - `MessageBroker` backed by `async-nats`.
 
-**NoopMessageBroker** - Reference no-op `MessageBroker`: publishing discards the message, subscribing yields an empty stream. `pub(crate)`, reachable only via `MessageBrokerFactory::noop()`.
+**NoopMessageBroker** - Reference no-op `MessageBroker`: publishing discards the message, subscribing yields an empty stream. `pub` (required as `AnyMessageBroker`'s own variant payload), but its containing module is never `pub`, so it stays unreachable to construct from outside `message-broker-svc-saf` — only `MessageBrokerFactory::noop()` returns one.
 
 **PostgresConfig** - `message-broker-svc-postgres-spi`'s config type (`url`, `queue_name`).
 

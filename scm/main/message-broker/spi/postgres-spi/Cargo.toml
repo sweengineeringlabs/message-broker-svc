@@ -1,6 +1,6 @@
 [package]
 name         = "message-broker-svc-postgres-spi"
-version      = "0.1.4"
+version      = "0.2.0"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
@@ -19,7 +19,7 @@ name = "message_broker_svc_postgres_spi"
 path = "src/lib.rs"
 
 [dependencies]
-message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", tag = "v0.2.0" }
+message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-broker-pattern.git", tag = "v0.3.0" }
 configbuilder = "0.8"
 serde      = { version = "1.0", features = ["derive"] }
 futures    = "0.3"

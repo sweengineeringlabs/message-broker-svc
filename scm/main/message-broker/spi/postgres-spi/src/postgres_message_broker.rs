@@ -1,6 +1,7 @@
 //! [`PostgresMessageBroker`] — Postgres-backed message broker via the `pgmq` extension.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +12,6 @@ use sqlx::PgPool;
 use sqlx::Row;
 
 use message_broker_pattern::BrokerError;
-use message_broker_pattern::BrokerFuture;
 use message_broker_pattern::HealthCheckRequest;
 use message_broker_pattern::Message;
 use message_broker_pattern::MessageBroker;
@@ -166,10 +166,13 @@ impl PostgresMessageBroker {
 }
 
 impl MessageBroker for PostgresMessageBroker {
-    fn publish<'a>(&'a self, request: PublishRequest) -> BrokerFuture<'a, Result<(), BrokerError>> {
+    fn publish(
+        &self,
+        request: PublishRequest,
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let pool = self.pool.clone();
         let topic = request.topic;
-        BrokerFuture::new(async move {
+        async move {
             Self::ensure_queue(&pool, &topic)
                 .await
                 .map_err(|e| BrokerError::Publish {
@@ -189,16 +192,16 @@ impl MessageBroker for PostgresMessageBroker {
                 })?;
 
             Ok(())
-        })
+        }
     }
 
-    fn subscribe<'a>(
-        &'a self,
+    fn subscribe(
+        &self,
         request: SubscribeRequest,
-    ) -> BrokerFuture<'a, Result<SubscribeResponse, BrokerError>> {
+    ) -> impl Future<Output = Result<SubscribeResponse, BrokerError>> + Send + '_ {
         let pool = self.pool.clone();
         let topic = request.topic;
-        BrokerFuture::new(async move {
+        async move {
             Self::ensure_queue(&pool, &topic)
                 .await
                 .map_err(|e| BrokerError::Subscribe {
@@ -239,21 +242,21 @@ impl MessageBroker for PostgresMessageBroker {
             Ok(SubscribeResponse {
                 stream: Box::pin(stream) as MessageStream,
             })
-        })
+        }
     }
 
     fn health_check(
         &self,
         _request: HealthCheckRequest,
-    ) -> BrokerFuture<'_, Result<(), BrokerError>> {
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let pool = self.pool.clone();
-        BrokerFuture::new(async move {
+        async move {
             sqlx::query("SELECT 1")
                 .execute(&pool)
                 .await
                 .map(|_| ())
                 .map_err(|e| BrokerError::Unavailable(e.to_string()))
-        })
+        }
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {

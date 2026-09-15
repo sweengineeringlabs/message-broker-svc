@@ -84,7 +84,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
+        use message_broker_pattern::{Message, MessageBroker, PublishRequest, SubscribeRequest};
 
         let dsn = require_postgres_dsn();
         let queue = "swe_edge_test_pub_sub_roundtrip";
@@ -130,7 +130,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
+        use message_broker_pattern::{Message, MessageBroker, PublishRequest, SubscribeRequest};
 
         let dsn = require_postgres_dsn();
         let queue = "swe_edge_test_pub_sub_headers";
@@ -180,7 +180,7 @@ mod postgres_feature {
         use std::sync::Arc;
 
         use futures::StreamExt as _;
-        use message_broker_pattern::{Message, PublishRequest, SubscribeRequest};
+        use message_broker_pattern::{Message, MessageBroker, PublishRequest, SubscribeRequest};
 
         let dsn = require_postgres_dsn();
         let queue = "swe_edge_test_survives_restart";

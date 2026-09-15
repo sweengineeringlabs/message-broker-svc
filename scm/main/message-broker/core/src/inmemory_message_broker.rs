@@ -8,12 +8,12 @@
 //! itself having a real implementation.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 
 use tokio::sync::{broadcast, RwLock};
 
 use message_broker_pattern::BrokerError;
-use message_broker_pattern::BrokerFuture;
 use message_broker_pattern::HealthCheckRequest;
 use message_broker_pattern::Message;
 use message_broker_pattern::MessageBroker;
@@ -84,25 +84,28 @@ impl Default for InMemoryMessageBroker {
 }
 
 impl MessageBroker for InMemoryMessageBroker {
-    fn publish<'a>(&'a self, request: PublishRequest) -> BrokerFuture<'a, Result<(), BrokerError>> {
+    fn publish(
+        &self,
+        request: PublishRequest,
+    ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let validation = Self::check_topic(&request.topic);
         let channels = Arc::clone(&self.channels);
-        BrokerFuture::new(async move {
+        async move {
             validation?;
             let map = channels.read().await;
             if let Some(tx) = map.get(&request.topic) {
                 let _ = tx.send((*request.message).clone());
             }
             Ok(())
-        })
+        }
     }
 
-    fn subscribe<'a>(
-        &'a self,
+    fn subscribe(
+        &self,
         request: SubscribeRequest,
-    ) -> BrokerFuture<'a, Result<SubscribeResponse, BrokerError>> {
+    ) -> impl Future<Output = Result<SubscribeResponse, BrokerError>> + Send + '_ {
         let channels = Arc::clone(&self.channels);
-        BrokerFuture::new(async move {
+        async move {
             let rx = {
                 let mut map = channels.write().await;
                 let tx = map
@@ -124,14 +127,11 @@ impl MessageBroker for InMemoryMessageBroker {
             Ok(SubscribeResponse {
                 stream: Box::pin(stream) as MessageStream,
             })
-        })
+        }
     }
 
-    fn health_check(
-        &self,
-        _request: HealthCheckRequest,
-    ) -> BrokerFuture<'_, Result<(), BrokerError>> {
-        BrokerFuture::new(async { Ok(()) })
+    async fn health_check(&self, _request: HealthCheckRequest) -> Result<(), BrokerError> {
+        Ok(())
     }
 
     fn validator(&self, _request: ValidatorRequest) -> Result<ValidatorResponse, BrokerError> {
