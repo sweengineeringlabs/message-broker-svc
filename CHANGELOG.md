@@ -12,6 +12,28 @@
 
 ### Verification
 
-- Workspace all-target check, Postgres SPI tests, strict Clippy, and consumer
-  workspace audit pass locally.
-- Live Postgres/pgmq tests and release publication remain pending.
+- CI passed Rust 1.99.1 formatting, strict Clippy across all workspace targets,
+  Postgres SPI tests, live pgmq integration tests, and cargo audit.
+- Published as `message-broker-svc-postgres-spi` 0.2.1 and tagged
+  `postgres-spi/v0.2.1` on main.
+
+## [message-broker-svc-core 0.4.1] - 2026-10-28
+
+### Changed
+
+- Declared the crates.io `message-broker-pattern` 0.3.0 version requirement
+  alongside the pinned Git source used by this workspace.
+
+## [message-broker-svc-nats-spi 0.3.1] - 2026-10-28
+
+### Changed
+
+- Declared the crates.io `message-broker-pattern` 0.3.0 version requirement
+  alongside the pinned Git source used by this workspace.
+
+## [message-broker-svc-kafka-spi 0.3.1] - 2026-10-28
+
+### Changed
+
+- Declared the crates.io `message-broker-pattern` 0.3.0 version requirement
+  alongside the pinned Git source used by this workspace.
