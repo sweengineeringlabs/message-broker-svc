@@ -42,6 +42,11 @@ jobs:
         run: cargo clippy --manifest-path scm/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: Workspace tests
         run: cargo test --manifest-path scm/Cargo.toml --workspace --all-targets --locked
+      - name: Verify publishable broker packages
+        run: |
+          cargo publish --manifest-path scm/main/message-broker/core/Cargo.toml --dry-run --locked
+          cargo publish --manifest-path scm/main/message-broker/spi/nats-spi/Cargo.toml --dry-run --locked
+          cargo publish --manifest-path scm/main/message-broker/spi/kafka-spi/Cargo.toml --dry-run --locked
       - name: Postgres SPI tests
         run: cargo test --manifest-path scm/Cargo.toml -p message-broker-svc-postgres-spi --all-targets --locked
       - name: Install pgmq extension
