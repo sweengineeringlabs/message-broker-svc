@@ -30,7 +30,10 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        with:
+          tool: cargo-audit@0.22.2
+          fallback: none
       - name: Format
         run: cargo fmt --manifest-path scm/Cargo.toml --all -- --check
       - name: Strict Clippy
