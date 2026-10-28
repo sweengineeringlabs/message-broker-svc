@@ -1,0 +1,50 @@
+name: Postgres SPI security and integration
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ghcr.io/pgmq/pg18-pgmq:v1.13.0
+        env:
+          POSTGRES_DB: edge_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d edge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/edge_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: clippy, rustfmt
+      - name: Install librdkafka build prerequisites
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes libcurl4-openssl-dev
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        with:
+          tool: cargo-audit@0.22.2
+          fallback: none
+      - name: Format
+        run: cargo fmt --manifest-path scm/Cargo.toml --all -- --check
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path scm/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - name: Postgres SPI tests
+        run: cargo test --manifest-path scm/Cargo.toml -p message-broker-svc-postgres-spi --all-targets --locked
+      - name: Install pgmq extension
+        run: psql "$POSTGRES_DSN" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pgmq;'
+      - name: Live pgmq integration tests
+        run: cargo test --manifest-path scm/Cargo.toml -p message-broker-svc-saf --features postgres --test postgres_message_broker_int_test -- --include-ignored
+      - name: Audit resolved dependencies
+        run: cargo audit --file scm/Cargo.lock
