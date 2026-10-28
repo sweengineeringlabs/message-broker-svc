@@ -40,6 +40,8 @@ jobs:
         run: cargo fmt --manifest-path scm/Cargo.toml --all -- --check
       - name: Strict Clippy
         run: cargo clippy --manifest-path scm/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - name: Workspace tests
+        run: cargo test --manifest-path scm/Cargo.toml --workspace --all-targets --locked
       - name: Postgres SPI tests
         run: cargo test --manifest-path scm/Cargo.toml -p message-broker-svc-postgres-spi --all-targets --locked
       - name: Install pgmq extension
