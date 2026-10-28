@@ -37,3 +37,10 @@
 
 - Declared the crates.io `message-broker-pattern` 0.3.0 version requirement
   alongside the pinned Git source used by this workspace.
+
+## [message-broker-svc-saf 0.4.1] - 2026-10-28
+
+### Changed
+
+- Align the facade's pattern, core, NATS, Kafka, and Postgres dependencies with
+  the current stable release family.
