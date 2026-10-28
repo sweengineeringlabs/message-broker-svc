@@ -1,6 +1,6 @@
 [package]
 name         = "message-broker-svc-postgres-spi"
-version      = "0.2.0"
+version      = "0.2.1"
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
 authors      = ["SWE Engineering Labs"]
@@ -23,8 +23,12 @@ message-broker-pattern = { git = "https://github.com/sweengineeringlabs/message-
 configbuilder = "0.8"
 serde      = { version = "1.0", features = ["derive"] }
 futures    = "0.3"
-tokio      = { version = "1.52", features = ["sync", "rt", "time"] }
-sqlx       = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "json"] }
+tokio      = { version = "1.52", features = ["sync", "rt", "time", "net"] }
+deadpool-postgres = "0.14"
+tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
+tokio-postgres-rustls = { version = "0.14", default-features = false, features = ["ring", "webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
+webpki-roots = "1.0"
 base64     = "0.22"
 serde_json = "1.0"
 
