@@ -886,7 +886,7 @@ dependencies = [
 
 [[package]]
 name = "message-broker-svc-postgres-spi"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64",
  "configbuilder",
