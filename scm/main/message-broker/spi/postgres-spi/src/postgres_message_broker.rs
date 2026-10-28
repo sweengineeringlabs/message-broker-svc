@@ -2,14 +2,19 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use futures::stream;
-use sqlx::PgPool;
-use sqlx::Row;
+use rustls::RootCertStore;
+use tokio_postgres::error::SqlState;
+use tokio_postgres::types::Json;
+use tokio_postgres::{Config as PostgresConnectOptions, Error as PostgresError};
+use tokio_postgres_rustls::MakeRustlsConnect;
 
 use message_broker_pattern::BrokerError;
 use message_broker_pattern::HealthCheckRequest;
@@ -48,7 +53,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(250);
 /// Requires the `pgmq` extension (`CREATE EXTENSION pgmq;`) installed on the
 /// target database.
 pub struct PostgresMessageBroker {
-    pool: PgPool,
+    pool: Pool,
     config: Arc<PostgresConfig>,
 }
 
@@ -66,38 +71,62 @@ impl PostgresMessageBroker {
         };
         config.validate_config()?;
 
-        let pool = PgPool::connect(dsn)
-            .await
-            .map_err(|e| BrokerError::Connection(e.to_string()))?;
-
-        Self::ensure_queue(&pool, queue_name)
-            .await
-            .map_err(|e| BrokerError::Connection(e.to_string()))?;
-
-        Ok(Self {
+        let options = PostgresConnectOptions::from_str(dsn)
+            .map_err(|error| BrokerError::Connection(error.to_string()))?;
+        let tls = Self::tls_connector()?;
+        let manager = Manager::from_config(
+            options,
+            tls,
+            ManagerConfig {
+                recycling_method: RecyclingMethod::Verified,
+            },
+        );
+        let pool = Pool::builder(manager)
+            .build()
+            .map_err(|error| BrokerError::Connection(error.to_string()))?;
+        let broker = Self {
             pool,
             config: Arc::new(config),
-        })
+        };
+
+        Self::ensure_queue(&broker.pool, queue_name)
+            .await
+            .map_err(|e| BrokerError::Connection(e.to_string()))?;
+
+        Ok(broker)
+    }
+
+    fn tls_connector() -> Result<MakeRustlsConnect, BrokerError> {
+        let mut roots = RootCertStore::empty();
+        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let tls_config = rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .map_err(|error| BrokerError::Connection(error.to_string()))?
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        Ok(MakeRustlsConnect::new(tls_config))
     }
 
     /// Create `queue_name` if it does not already exist.
     ///
     /// Tolerates the "already exists" case as success — `pgmq.create` is not
     /// guaranteed idempotent across all `pgmq` versions.
-    async fn ensure_queue(pool: &PgPool, queue_name: &str) -> Result<(), sqlx::Error> {
-        let result = sqlx::query("SELECT pgmq.create($1)")
-            .bind(queue_name)
-            .execute(pool)
-            .await;
-
-        match result {
+    async fn ensure_queue(pool: &Pool, queue_name: &str) -> Result<(), String> {
+        let client = pool.get().await.map_err(|error| error.to_string())?;
+        match client
+            .query_one("SELECT pgmq.create($1)", &[&queue_name])
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(sqlx::Error::Database(ref db_err))
-                if db_err.message().contains("already exists") =>
+            Err(error)
+                if error
+                    .as_db_error()
+                    .is_some_and(|db_error| db_error.code() == &SqlState::DUPLICATE_TABLE) =>
             {
                 Ok(())
             }
-            Err(e) => Err(e),
+            Err(error) => Err(error.to_string()),
         }
     }
 
@@ -120,7 +149,7 @@ impl PostgresMessageBroker {
     /// itself is a plain two-arm match, no loop.
     fn decode_popped_row(
         topic: &str,
-        value: Result<serde_json::Value, sqlx::Error>,
+        value: Result<serde_json::Value, PostgresError>,
     ) -> Result<Message, BrokerError> {
         match value {
             Ok(v) => Self::decode(v).map_err(|reason| BrokerError::Subscribe {
@@ -181,10 +210,12 @@ impl MessageBroker for PostgresMessageBroker {
                 })?;
 
             let payload = Self::encode(&request.message);
-            sqlx::query("SELECT pgmq.send($1, $2::jsonb)")
-                .bind(&topic)
-                .bind(&payload)
-                .execute(&pool)
+            let client = pool.get().await.map_err(|error| BrokerError::Publish {
+                topic: topic.clone(),
+                reason: error.to_string(),
+            })?;
+            client
+                .query_one("SELECT pgmq.send($1, $2::jsonb)", &[&topic, &Json(payload)])
                 .await
                 .map_err(|e| BrokerError::Publish {
                     topic: topic.clone(),
@@ -211,15 +242,28 @@ impl MessageBroker for PostgresMessageBroker {
 
             let stream = stream::unfold((pool, topic), |(pool, topic)| async move {
                 loop {
-                    let row = sqlx::query("SELECT message FROM pgmq.pop($1)")
-                        .bind(&topic)
-                        .fetch_optional(&pool)
-                        .await;
+                    let row = match pool.get().await {
+                        Ok(client) => {
+                            client
+                                .query_opt("SELECT message FROM pgmq.pop($1)", &[&topic])
+                                .await
+                        }
+                        Err(error) => {
+                            return Some((
+                                Err(BrokerError::Subscribe {
+                                    topic: topic.clone(),
+                                    reason: error.to_string(),
+                                }),
+                                (pool, topic),
+                            ));
+                        }
+                    };
 
                     match row {
                         Ok(Some(row)) => {
-                            let value: Result<serde_json::Value, sqlx::Error> =
+                            let value: Result<Json<serde_json::Value>, PostgresError> =
                                 row.try_get("message");
+                            let value = value.map(|json| json.0);
                             let result = Self::decode_popped_row(&topic, value);
                             return Some((result, (pool, topic)));
                         }
@@ -251,8 +295,12 @@ impl MessageBroker for PostgresMessageBroker {
     ) -> impl Future<Output = Result<(), BrokerError>> + Send + '_ {
         let pool = self.pool.clone();
         async move {
-            sqlx::query("SELECT 1")
-                .execute(&pool)
+            let client = pool
+                .get()
+                .await
+                .map_err(|error| BrokerError::Unavailable(error.to_string()))?;
+            client
+                .query_one("SELECT 1", &[])
                 .await
                 .map(|_| ())
                 .map_err(|e| BrokerError::Unavailable(e.to_string()))
